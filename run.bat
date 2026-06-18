@@ -27,6 +27,9 @@ if not exist ".env" (
   echo.
 )
 
+REM Giai phong cong 8000 neu con tien trinh cu dang giu (tranh loi "address already in use")
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000 " ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>&1
+
 echo [3/3] Khoi dong server tai http://localhost:8000 ...
 start "" http://localhost:8000
 python -m uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000
