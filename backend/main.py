@@ -8,11 +8,17 @@ from __future__ import annotations
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 import config
 import gemini_client
 import prompts
 import replicate_client
+
+
+class KeyConfig(BaseModel):
+    gemini_api_key: str | None = None
+    replicate_api_token: str | None = None
 
 app = FastAPI(title="HungArch AI Render", version="1.1.0")
 
@@ -34,6 +40,16 @@ def get_presets():
         ],
         "resolutions": config.VALID_RESOLUTIONS,
         "default_resolution": config.DEFAULT_RESOLUTION,
+        "api_key_configured": bool(config.GEMINI_API_KEY),
+        "replicate_configured": bool(config.REPLICATE_API_TOKEN),
+    }
+
+
+@app.post("/api/config")
+def set_config(body: KeyConfig):
+    """Nhập/cập nhật khóa API ngay trong app (lưu xuống .env). Không trả lại khóa."""
+    config.set_keys(gemini=body.gemini_api_key, replicate=body.replicate_api_token)
+    return {
         "api_key_configured": bool(config.GEMINI_API_KEY),
         "replicate_configured": bool(config.REPLICATE_API_TOKEN),
     }

@@ -93,15 +93,44 @@
       $('resolutionSelect').innerHTML = p.resolutions
         .map((r) => `<option ${r === p.default_resolution ? 'selected' : ''}>${r}</option>`).join('');
 
-      const st = $('apiStatus');
-      if (p.api_key_configured) {
-        st.textContent = '● API sẵn sàng';
-        st.className = 'ml-auto text-xs px-2 py-1 rounded-full bg-emerald-900 text-emerald-300';
-      } else {
-        st.textContent = '● Thiếu API key';
-        st.className = 'ml-auto text-xs px-2 py-1 rounded-full bg-red-900 text-red-300';
-        st.title = 'Tạo file .env và điền GEMINI_API_KEY';
-      }
+      applyStatus(p);
+    } catch (e) {
+      toast(e.message, false);
+    }
+  }
+
+  function applyStatus(s) {
+    const st = $('apiStatus');
+    if (s.api_key_configured) {
+      st.textContent = '● API sẵn sàng';
+      st.className = 'ml-auto text-xs px-2 py-1 rounded-full bg-emerald-900 text-emerald-300';
+    } else {
+      st.textContent = '● Thiếu API key';
+      st.className = 'ml-auto text-xs px-2 py-1 rounded-full bg-red-900 text-red-300';
+    }
+    const parts = [];
+    parts.push(s.api_key_configured ? 'Gemini ✓' : 'Gemini ✗');
+    parts.push(s.replicate_configured ? 'Replicate ✓' : 'Replicate ✗');
+    $('keySummary').textContent = '— ' + parts.join(' · ');
+    // Mở sẵn panel nhập khóa nếu chưa có khóa nào.
+    if (!s.api_key_configured && !s.replicate_configured) {
+      $('keyPanel').open = true;
+    }
+  }
+
+  async function saveKeys() {
+    const gemini = $('geminiKey').value.trim();
+    const replicate = $('replicateKey').value.trim();
+    if (!gemini && !replicate) { toast('Hãy nhập ít nhất một khóa.', false); return; }
+    const body = {};
+    if (gemini) body.gemini_api_key = gemini;
+    if (replicate) body.replicate_api_token = replicate;
+    try {
+      await API.setConfig(body);
+      $('geminiKey').value = '';
+      $('replicateKey').value = '';
+      await loadPresets();           // làm mới trạng thái + engine khả dụng
+      toast('Đã lưu khóa API.');
     } catch (e) {
       toast(e.message, false);
     }
@@ -223,6 +252,7 @@
     $('renderBtn').addEventListener('click', doRender);
     $('inpaintBtn').addEventListener('click', doInpaint);
     $('engineSelect').addEventListener('change', updateEngineHint);
+    $('saveKeysBtn').addEventListener('click', saveKeys);
     $('brushSize').addEventListener('input', (e) => maskTool.setBrush(e.target.value));
     $('clearMaskBtn').addEventListener('click', () => maskTool.clear());
 

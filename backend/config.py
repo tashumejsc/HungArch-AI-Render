@@ -63,6 +63,47 @@ SUPPORTED_ASPECT_RATIOS = {
 # Đảm bảo thư mục output tồn tại ngay khi import.
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
+ENV_PATH = ROOT_DIR / ".env"
+
+
+def _update_env_file(updates: dict[str, str]) -> None:
+    """Ghi/cập nhật các khóa vào file .env (để lần sau khởi động vẫn còn)."""
+    lines = ENV_PATH.read_text(encoding="utf-8").splitlines() if ENV_PATH.exists() else []
+    seen = set()
+    out = []
+    for line in lines:
+        head = line.split("=", 1)[0].strip()
+        if head in updates:
+            out.append(f"{head}={updates[head]}")
+            seen.add(head)
+        else:
+            out.append(line)
+    for k, v in updates.items():
+        if k not in seen:
+            out.append(f"{k}={v}")
+    ENV_PATH.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
+def set_keys(gemini: str | None = None, replicate: str | None = None) -> None:
+    """Cập nhật khóa API lúc đang chạy (từ giao diện) và lưu xuống .env."""
+    global GEMINI_API_KEY, REPLICATE_API_TOKEN
+    updates: dict[str, str] = {}
+    if gemini is not None:
+        GEMINI_API_KEY = gemini.strip()
+        ENGINES["gemini"]["available"] = bool(GEMINI_API_KEY)
+        if GEMINI_API_KEY:
+            updates["GEMINI_API_KEY"] = GEMINI_API_KEY
+    if replicate is not None:
+        REPLICATE_API_TOKEN = replicate.strip()
+        ENGINES["replicate"]["available"] = bool(REPLICATE_API_TOKEN)
+        if REPLICATE_API_TOKEN:
+            updates["REPLICATE_API_TOKEN"] = REPLICATE_API_TOKEN
+    if updates:
+        try:
+            _update_env_file(updates)
+        except Exception:
+            pass  # không lưu được .env thì vẫn dùng được trong phiên hiện tại
+
 
 def model_id(model_key: str | None) -> str:
     """Trả về model id thật từ khóa 'pro'/'flash'. Mặc định = pro."""

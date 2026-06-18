@@ -6,6 +6,17 @@ const API = {
     return r.json();
   },
 
+  async setConfig(body) {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || 'Không lưu được khóa.');
+    return data;
+  },
+
   async render(formData) {
     const r = await fetch('/api/render', { method: 'POST', body: formData });
     const data = await r.json().catch(() => ({}));

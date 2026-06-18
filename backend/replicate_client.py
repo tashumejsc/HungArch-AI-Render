@@ -21,21 +21,23 @@ class ReplicateError(RuntimeError):
 
 
 _client = None
+_client_token: str | None = None
 
 
 def _get_client():
-    global _client
+    global _client, _client_token
     if not config.REPLICATE_API_TOKEN:
         raise ReplicateError(
-            "Chưa cấu hình REPLICATE_API_TOKEN. Hãy thêm vào file .env: "
-            "REPLICATE_API_TOKEN=<token của bạn> (lấy ở https://replicate.com/account/api-tokens)."
+            "Chưa cấu hình REPLICATE_API_TOKEN. Hãy nhập ở mục '🔑 Cấu hình khóa API' "
+            "trong app (hoặc file .env). Lấy token ở https://replicate.com/account/api-tokens."
         )
-    if _client is None:
+    if _client is None or _client_token != config.REPLICATE_API_TOKEN:
         try:
             import replicate  # import lười để app vẫn boot nếu chưa cài
         except ImportError as exc:
             raise ReplicateError("Chưa cài thư viện 'replicate'. Chạy: pip install replicate") from exc
         _client = replicate.Client(api_token=config.REPLICATE_API_TOKEN)
+        _client_token = config.REPLICATE_API_TOKEN
     return _client
 
 

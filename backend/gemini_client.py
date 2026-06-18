@@ -26,17 +26,20 @@ class GeminiError(RuntimeError):
 
 # --- Client khởi tạo lười (lazy) để app vẫn boot được khi chưa có API key ---
 _client: genai.Client | None = None
+_client_key: str | None = None
 
 
 def _get_client() -> genai.Client:
-    global _client
+    global _client, _client_key
     if not config.GEMINI_API_KEY:
         raise GeminiError(
-            "Chưa cấu hình GEMINI_API_KEY. Hãy tạo file .env ở thư mục gốc và điền "
-            "GEMINI_API_KEY=<khóa của bạn> (lấy miễn phí tại Google AI Studio)."
+            "Chưa cấu hình GEMINI_API_KEY. Hãy nhập khóa ở mục '🔑 Cấu hình khóa API' "
+            "trong app (hoặc điền vào file .env). Lấy khóa miễn phí tại Google AI Studio."
         )
-    if _client is None:
+    # Dựng lại client nếu khóa được đổi lúc đang chạy (từ giao diện).
+    if _client is None or _client_key != config.GEMINI_API_KEY:
         _client = genai.Client(api_key=config.GEMINI_API_KEY)
+        _client_key = config.GEMINI_API_KEY
     return _client
 
 
