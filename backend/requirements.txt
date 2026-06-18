@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.34
+google-genai>=1.38
+python-multipart>=0.0.20
+pillow>=11.1
+python-dotenv>=1.0
+replicate>=1.0

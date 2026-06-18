@@ -1,0 +1,21 @@
+# --- Bí mật: KHÔNG bao giờ đẩy khóa API lên GitHub ---
+.env
+
+# Môi trường ảo Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Ảnh đã render & metadata (sản phẩm chạy ra, không cần version)
+outputs/*
+!outputs/.gitkeep
+
+# Hệ điều hành / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Preview / launch config cục bộ
+.claude/
