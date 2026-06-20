@@ -4,52 +4,56 @@
 
 ## Tính năng
 
-- **2 tab làm việc:**
-  - 🛋️ **Nội thất** — phong cách: Hiện đại, Tối giản, Japandi, Tân cổ điển, Thiền/Á Đông, Nhiệt đới + ô mô tả vật liệu & ánh sáng.
-  - 🏙️ **Ngoại thất** — bối cảnh VN (Phố cổ Hà Nội, Shophouse, Nhà ống, Làng quê Bắc Bộ, Đồi núi sương mù, Miệt vườn) + thời tiết (Nắng gắt, U ám sau mưa, Giờ xanh).
-- **2 Engine AI lựa chọn:**
-  - **Gemini** — nhanh, dễ dùng, hỗ trợ Reference Image để đồng nhất.
-  - **Replicate** (FLUX + ControlNet depth) — **seed thật** (tái lập 100%) + giữ hình học chính xác hơn; inpaint bằng mask thật (flux-fill). Trả phí theo ảnh.
+- **3 tab làm việc:**
+  - 🛋️ **Nội thất** — phong cách: Hiện đại, Tối giản, Japandi, Tân cổ điển, Thiền/Á Đông, Nhiệt đới, Văn phòng, Nhà hàng, Resort...
+  - 🏙️ **Ngoại thất** — bối cảnh VN (Phố cổ Hà Nội, Shophouse, Nhà ống, Làng quê Bắc Bộ, Đồi núi sương mù, Resort biển...) + thời tiết (Nắng gắt, U ám sau mưa, Giờ xanh).
+  - ✏️ **Bản vẽ 2D** — chuyển mặt bằng AutoCAD / phác thảo tay → phối cảnh nội thất hoặc ngoại thất 3D; hoặc làm đẹp bản vẽ 2D.
 - **Đồng bộ Style** — tải ảnh render ưng ý làm reference để "hút" tone màu & vật liệu.
-- **Khóa Seed / mã ảnh** — mỗi ảnh có mã Seed copy được để truy vết (Replicate: seed số nguyên tái lập được).
-- **Hậu kỳ (Inpaint)** — bôi mask lên ảnh kết quả rồi sửa cục bộ bằng text.
-- **Output** — ảnh độ phân giải cao (1K/2K/4K), tải về, lịch sử phiên.
+- **Hậu kỳ (Inpaint):**
+  - ✍️ **Vẽ mask** — bôi vùng cần sửa bằng cọ, nhập mô tả, AI sửa đúng vùng đó.
+  - 📝 **Mô tả văn bản** — chỉnh sửa không cần vẽ (VD: "thay sàn gỗ phòng khách bằng đá granite").
+  - So sánh trước/sau trước khi áp dụng.
+- **🔄 Render lại từ gốc** — sau nhiều lần sửa, gộp toàn bộ chỉnh sửa và render lại từ ảnh SketchUp gốc để tránh lệch hình học tích lũy.
+- **✨ AI Nâng cao** — tăng độ sắc nét texture, PBR, ánh sáng không cần render lại.
+- **🎨 Gợi ý màu AI** — phân tích ảnh và đề xuất thông số colour-grading theo mood (Ấm áp sang trọng, Lạnh tối giản...).
+- **Điều chỉnh màu thủ công** — brightness, contrast, saturation, warmth + preset (Film, Cinematic, B&W...).
+- **Seed / mã ảnh** — mỗi ảnh có mã ID = tên file thật trong `outputs/`, copy được để truy vết.
 
 ## Yêu cầu
 
 - **Python 3.10+** đã cài (tích "Add Python to PATH" khi cài đặt).
-- **Gemini API key** (miễn phí): https://aistudio.google.com/apikey
-- (Tùy chọn) **Replicate API token** nếu muốn dùng engine Replicate: https://replicate.com/account/api-tokens — điền `REPLICATE_API_TOKEN=...` vào `.env`.
+- **Gemini API key** (cần bật billing — Gemini Image không có free tier): https://aistudio.google.com/apikey
 
 ## Cài đặt & chạy (Windows)
 
-1. Lấy API key ở link trên.
+1. Lấy API key ở link trên, bật billing tại console.cloud.google.com.
 2. Mở thư mục dự án, copy `.env.example` thành `.env`, điền:
    ```
    GEMINI_API_KEY=khoa_cua_ban
    ```
-   (Nếu quên, `run.bat` sẽ tự tạo `.env` cho bạn — chỉ cần điền key rồi chạy lại.)
+   (Nếu quên, có thể nhập key trực tiếp trong app — mục "🔑 Cấu hình khóa API".)
 3. Bấm đúp **`run.bat`**. Lần đầu sẽ tự cài thư viện (mất vài phút).
 4. Trình duyệt tự mở `http://localhost:8000`.
 
 ## Cách dùng nhanh
 
-1. Chọn tab Nội thất / Ngoại thất → tải ảnh SketchUp.
+1. Chọn tab Nội thất / Ngoại thất / Bản vẽ 2D → tải ảnh SketchUp.
 2. Chọn phong cách / bối cảnh, nhập mô tả → **TẠO RENDER**.
 3. Muốn các góc đồng nhất: bấm **Dùng làm Reference** rồi render góc tiếp theo.
-4. Sửa cục bộ: bấm **Bật/tắt vẽ mask**, bôi vùng cần sửa, nhập chỉ thị → **SỬA VÙNG ĐÃ CHỌN**.
-5. Bấm **Tải về** và copy **Seed** nếu cần lưu.
+4. Sửa cục bộ: chọn chế độ **Vẽ mask** hoặc **Mô tả văn bản** → sửa → so sánh trước/sau → Áp dụng.
+5. Bấm **Tải về** và ghi nhớ **Seed** (= tên file trong `outputs/`) nếu cần truy vết.
 
 ## Lưu ý kỹ thuật
 
-- **Giữ hình học:** với **Gemini** dùng prompt khóa cứng (rất tốt nhưng không tuyệt đối 100%); với **Replicate** dùng ControlNet depth nên giữ khối chính xác hơn.
-- **Seed:** Gemini không có seed tái lập y hệt → dùng cùng Reference Image + phong cách để đồng nhất. **Replicate có seed thật** (số nguyên) — nhập cùng một số Seed sẽ ra kết quả ổn định.
-- Ảnh kết quả lưu trong thư mục `outputs/` (kèm file `.json` ghi prompt/metadata).
+- **Giữ hình học:** prompt khóa cứng (GEOMETRY_LOCK) bảo Gemini giữ nguyên bố cục SketchUp — tốt nhưng không tuyệt đối 100%.
+- **Seed:** Gemini không có seed tái lập y hệt → dùng cùng Reference Image + phong cách để giữ đồng nhất giữa các góc render. Mã Seed trong app = tên file thật trong `outputs/` để truy vết.
+- **Tránh lệch hình học:** sau nhiều lần inpaint liên tiếp, dùng "🔄 Render lại từ gốc" để gộp và render sạch từ ảnh SketchUp ban đầu.
+- Ảnh kết quả lưu trong `outputs/` (kèm file `.json` ghi prompt/metadata).
 
 ## Cấu trúc
 
 ```
-backend/   FastAPI (config, prompts, store, gemini_client, replicate_client, main)
+backend/   FastAPI (config, prompts, store, gemini_client, main)
 frontend/  HTML + CSS + JS thuần (index.html, css/, js/)
 outputs/   Ảnh đã render + metadata
 run.bat    Chạy 1 chạm
@@ -57,10 +61,8 @@ run.bat    Chạy 1 chạm
 
 ## Đưa code lên GitHub
 
-Repo git đã được khởi tạo & commit sẵn (đã loại trừ `.env`, `.venv`, `outputs/`). Để đẩy lên tài khoản của bạn (đã cài sẵn `gh`):
-
 ```bash
-gh auth login                 # đăng nhập GitHub (1 lần, qua trình duyệt)
+gh auth login
 gh repo create hungarch-ai-render --source=. --private --push
 ```
 

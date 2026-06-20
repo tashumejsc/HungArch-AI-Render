@@ -1,6 +1,6 @@
-"""Lưu trữ kết quả render dùng chung cho mọi engine (Gemini, Replicate).
+"""Lưu trữ kết quả render cho HungArch AI Render (Gemini engine).
 
-Tách riêng để các client không trùng lặp logic lưu ảnh + metadata.
+Tách riêng để client không trùng lặp logic lưu ảnh + metadata.
 """
 from __future__ import annotations
 
@@ -17,23 +17,19 @@ import config
 
 @dataclass
 class RenderResult:
-    seed: str          # mã hiển thị cho người dùng (Gemini: mã truy vết; Replicate: seed thật)
+    seed: str          # = tên file thật trên đĩa (HA<timestamp><hex>), dùng copy/truy vết
     image_filename: str
     image_url: str
     prompt_used: str
 
 
 def new_token() -> str:
-    """Mã định danh ngắn, duy nhất — dùng đặt tên file (tránh trùng)."""
+    """Mã định danh ngắn, duy nhất — dùng đặt tên file và làm seed hiển thị."""
     return f"HA{int(time.time())}{secrets.token_hex(2)}".upper()
 
 
-def random_seed() -> int:
-    """Seed số nguyên ngẫu nhiên (cho engine hỗ trợ seed thật như Replicate)."""
-    return secrets.randbelow(2_147_483_647)
-
-
-def save_result(image_bytes: bytes, *, display_seed: str, prompt_used: str, meta: dict) -> RenderResult:
+def save_result(image_bytes: bytes, *, prompt_used: str, meta: dict) -> RenderResult:
+    """Lưu ảnh + metadata; trả về RenderResult với seed = chính token tên file."""
     token = new_token()
     png_path = config.OUTPUTS_DIR / f"{token}.png"
     try:
@@ -44,7 +40,6 @@ def save_result(image_bytes: bytes, *, display_seed: str, prompt_used: str, meta
 
     record = {
         "token": token,
-        "seed": display_seed,
         "prompt": prompt_used,
         "created": time.time(),
         **meta,
@@ -53,7 +48,7 @@ def save_result(image_bytes: bytes, *, display_seed: str, prompt_used: str, meta
         json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return RenderResult(
-        seed=str(display_seed),
+        seed=token,                          # seed = token = tên file, không tách biệt
         image_filename=png_path.name,
         image_url=f"/outputs/{png_path.name}",
         prompt_used=prompt_used,

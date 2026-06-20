@@ -30,4 +30,18 @@ const API = {
     if (!r.ok) throw new Error(data.detail || 'Lỗi khi sửa cục bộ.');
     return data;
   },
+
+  async enhance(formData) {
+    const r = await fetch('/api/enhance', { method: 'POST', body: formData });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || 'Lỗi khi nâng cao ảnh.');
+    return data;
+  },
+
+  async analyzeMood(formData) {
+    const r = await fetch('/api/analyze-mood', { method: 'POST', body: formData });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || 'Lỗi khi phân tích mood màu.');
+    return data;
+  },
 };

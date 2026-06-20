@@ -34,19 +34,16 @@
             <label class="lbl">Gemini API key <span class="text-slate-400 text-xs">(aistudio.google.com/apikey)</span></label>
             <input id="geminiKey" type="password" class="inp" placeholder="dán khóa Gemini vào đây" autocomplete="off" />
           </div>
-          <div>
-            <label class="lbl">Replicate API token <span class="text-slate-400 text-xs">(tùy chọn)</span></label>
-            <input id="replicateKey" type="password" class="inp" placeholder="dán token Replicate (nếu dùng)" autocomplete="off" />
-          </div>
-          <button id="saveKeysBtn" class="btn-secondary w-full">💾 Lưu khóa</button>
-          <p class="hint">Khóa được lưu vào file <code>.env</code> trên máy này, không gửi đi đâu khác. Cần internet để render.</p>
+          <button id="saveKeysBtn" class="btn-secondary w-full">💾 Lưu khóa Gemini</button>
+          <p class="hint">Khóa được lưu vào file <code>.env</code> trên máy này, không gửi đi đâu khác. Lấy miễn phí tại <strong>aistudio.google.com/apikey</strong>.</p>
         </div>
       </details>
 
       <!-- Tabs -->
       <div class="flex gap-2 p-1 bg-slate-800 rounded-xl">
-        <button data-tab="interior" class="tab-btn flex-1 py-2.5 rounded-lg text-sm font-semibold transition">🛋️ DIỄN HỌA NỘI THẤT</button>
-        <button data-tab="exterior" class="tab-btn flex-1 py-2.5 rounded-lg text-sm font-semibold transition">🏙️ DIỄN HỌA NGOẠI THẤT</button>
+        <button data-tab="interior" class="tab-btn flex-1 py-2.5 rounded-lg text-sm font-semibold transition">🛋️ NỘI THẤT</button>
+        <button data-tab="exterior" class="tab-btn flex-1 py-2.5 rounded-lg text-sm font-semibold transition">🏙️ NGOẠI THẤT</button>
+        <button data-tab="drawing"  class="tab-btn flex-1 py-2.5 rounded-lg text-sm font-semibold transition">✏️ BẢN VẼ 2D</button>
       </div>
 
       <!-- TAB NỘI THẤT -->
@@ -95,15 +92,88 @@
         </div>
       </div>
 
+      <!-- TAB BẢN VẼ 2D -->
+      <div id="tab-drawing" class="tab-panel space-y-4 hidden">
+        <div class="card">
+          <label class="lbl">Ảnh bản vẽ (AutoCAD / phác thảo tay)</label>
+          <div class="dropzone" data-target="drawingImage">
+            <input type="file" accept="image/*" class="hidden" id="drawingImage" />
+            <img class="preview hidden" />
+            <div class="ph">📐 Kéo thả hoặc bấm để tải ảnh bản vẽ AutoCAD / phác thảo</div>
+          </div>
+        </div>
+
+        <div class="card space-y-3">
+          <!-- Loại bản vẽ -->
+          <div>
+            <label class="lbl">Loại bản vẽ đầu vào</label>
+            <div class="flex gap-2 mt-1">
+              <button id="dtAutocad" class="input-type-btn flex-1 active" data-dtype="autocad">📐 AutoCAD / Kỹ thuật</button>
+              <button id="dtSketch"  class="input-type-btn flex-1" data-dtype="sketch">✏️ Phác thảo tay</button>
+            </div>
+          </div>
+
+          <!-- Kết quả muốn tạo -->
+          <div>
+            <label class="lbl">Kết quả AI tạo ra</label>
+            <div class="flex gap-2 mt-1">
+              <button id="dm3d" class="input-type-btn flex-1 active" data-dmode="3d_perspective">🏠 Phối cảnh 3D</button>
+              <button id="dm2d" class="input-type-btn flex-1" data-dmode="2d_render">📋 Render 2D đẹp</button>
+            </div>
+            <p id="drawingModeHint" class="hint mt-1">AI tưởng tượng không gian 3D từ bố cục mặt bằng và tạo phối cảnh nội thất thực tế.</p>
+          </div>
+
+          <!-- Nội thất / Ngoại thất (chỉ hiện khi 3D) -->
+          <div id="drawingOutputWrap">
+            <label class="lbl">Loại phối cảnh 3D</label>
+            <div class="flex gap-2 mt-1">
+              <button id="doInterior" class="input-type-btn flex-1 active" data-doutput="interior">🛋️ Nội thất (mặt bằng)</button>
+              <button id="doExterior" class="input-type-btn flex-1" data-doutput="exterior">🏙️ Ngoại thất (mặt đứng)</button>
+            </div>
+          </div>
+
+          <!-- Phong cách nội thất (chỉ hiện khi 3D + Nội thất) -->
+          <div id="drawingStyleWrap">
+            <label class="lbl">Phong cách nội thất</label>
+            <select id="drawingStyleSelect" class="inp"></select>
+          </div>
+
+          <!-- Bối cảnh + Thời tiết ngoại thất (chỉ hiện khi 3D + Ngoại thất) -->
+          <div id="drawingExtWrap" class="hidden space-y-3">
+            <div>
+              <label class="lbl">Bối cảnh Việt Nam</label>
+              <select id="drawingContextSelect" class="inp"></select>
+            </div>
+            <div>
+              <label class="lbl">Thời tiết & ánh sáng</label>
+              <select id="drawingWeatherSelect" class="inp"></select>
+            </div>
+          </div>
+
+          <!-- Prompt -->
+          <div>
+            <label class="lbl">Mô tả thêm <span class="text-slate-500 font-normal text-xs">(tùy chọn)</span></label>
+            <textarea id="drawingPrompt" rows="2" class="inp"
+              placeholder="VD: nhà phố 3 tầng, hành lang rộng 1.2m, phòng khách hướng Đông, thêm cây xanh ngoài ban công..."></textarea>
+          </div>
+        </div>
+      </div>
+
       <!-- THIẾT LẬP CHUNG -->
       <div class="card border-amber-500/30">
         <h3 class="text-sm font-bold text-amber-400 mb-3">⚙️ Thiết lập chung & Hậu kỳ</h3>
 
-        <label class="lbl">Engine AI</label>
-        <select id="engineSelect" class="inp"></select>
-        <p id="engineHint" class="hint mt-1"></p>
+        <!-- LOẠI ẢNH ĐẦU VÀO -->
+        <label class="lbl">Loại ảnh SketchUp đầu vào</label>
+        <div class="flex gap-2 mt-1">
+          <button id="itWireframe" class="input-type-btn flex-1 active">🖊️ Đen trắng / Khối thô</button>
+          <button id="itTextured"  class="input-type-btn flex-1">🎨 Đã áp vật liệu</button>
+        </div>
+        <p id="inputTypeHint" class="hint mt-1 mb-4">
+          AI thêm vật liệu + ánh sáng hoàn toàn mới theo preset đã chọn.
+        </p>
 
-        <label class="lbl mt-4">Đồng bộ Style (Reference Image)</label>
+        <label class="lbl">Đồng bộ Style (Reference Image)</label>
         <p class="hint">Tải ảnh đã render ưng ý trước đó để AI "hút" tone màu & vật liệu cho các góc tiếp theo.</p>
         <div class="dropzone mt-1" data-target="referenceImage">
           <input type="file" accept="image/*" class="hidden" id="referenceImage" />
@@ -111,10 +181,22 @@
           <div class="ph text-xs">📎 Ảnh tham chiếu (tùy chọn)</div>
         </div>
 
+        <!-- Thời điểm ánh sáng -->
+        <div class="mt-4">
+          <label class="lbl">Thời điểm ánh sáng</label>
+          <select id="lightingSelect" class="inp"></select>
+        </div>
+
+        <!-- Độ dày cây xanh (chỉ ngoại thất) -->
+        <div class="mt-4 hidden" id="vegetationWrap">
+          <label class="lbl">Độ dày cây xanh</label>
+          <select id="vegetationSelect" class="inp"></select>
+        </div>
+
         <div class="grid grid-cols-2 gap-3 mt-4">
           <div>
             <label class="lbl">Khóa Seed
-              <span class="cursor-help text-slate-400" title="Gemini không có seed tái lập 100% như Stable Diffusion. Để các góc đồng nhất, hãy dùng cùng Reference Image + cùng phong cách/mô tả. Mã Seed ở đây dùng để đặt tên & truy vết ảnh.">ⓘ</span>
+              <span class="cursor-help text-slate-400" title="Mã Seed = tên file thật trong outputs/. Dùng để truy vết ảnh đã tạo, không đảm bảo tái lập y hệt.">ⓘ</span>
             </label>
             <input id="seedInput" class="inp" placeholder="để trống = tự sinh" />
           </div>
@@ -125,7 +207,7 @@
         </div>
 
         <div class="mt-3">
-          <label class="lbl">Model</label>
+          <label class="lbl">Model (Gemini)</label>
           <select id="modelSelect" class="inp"></select>
         </div>
 
@@ -135,18 +217,30 @@
 
     <!-- CỘT PHẢI: kết quả & hậu kỳ -->
     <section class="space-y-5">
-      <div class="card min-h-[320px] flex flex-col">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-bold">🖼️ Kết quả</h3>
-          <div id="seedBadge" class="hidden items-center gap-2 text-xs">
-            <span class="text-slate-400">Seed:</span>
-            <code id="seedValue" class="bg-slate-700 px-2 py-0.5 rounded font-mono"></code>
-            <button id="copySeed" class="text-amber-400 hover:text-amber-300">📋 copy</button>
+
+      <!-- ── KẾT QUẢ (3 chế độ xem) ── -->
+      <div class="card flex flex-col" style="min-height:360px">
+
+        <!-- Header: tiêu đề + view tabs + seed -->
+        <div class="flex items-center gap-2 mb-2 flex-wrap">
+          <h3 class="text-sm font-bold shrink-0">🖼️ Kết quả</h3>
+          <div class="flex gap-1 ml-auto flex-wrap">
+            <button id="vtResult"  class="view-tab active">Kết quả</button>
+            <button id="vtCompare" class="view-tab">⟺ So sánh</button>
+            <button id="vtAdjust"  class="view-tab">✏️ Điều chỉnh</button>
           </div>
         </div>
 
-        <div id="resultWrap" class="flex-1 flex items-center justify-center rounded-lg bg-slate-800/60 relative overflow-hidden">
-          <p id="resultPlaceholder" class="text-slate-500 text-sm text-center px-6">Ảnh render độ phân giải cao sẽ hiển thị ở đây.</p>
+        <!-- Seed badge -->
+        <div id="seedBadge" class="hidden items-center gap-2 text-xs mb-2">
+          <span class="text-slate-400">Seed:</span>
+          <code id="seedValue" class="bg-slate-700 px-2 py-0.5 rounded font-mono"></code>
+          <button id="copySeed" class="text-amber-400 hover:text-amber-300">📋 copy</button>
+        </div>
+
+        <!-- VIEW 1: Kết quả (canvas + loading) -->
+        <div id="viewResult" class="flex-1 flex items-center justify-center rounded-lg bg-slate-800/60 relative overflow-hidden">
+          <p id="resultPlaceholder" class="text-slate-500 text-sm text-center px-6">Ảnh render sẽ hiển thị ở đây sau khi tạo.</p>
           <canvas id="maskCanvas" class="hidden max-w-full max-h-[60vh] touch-none"></canvas>
           <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center gap-3">
             <div class="spinner"></div>
@@ -154,31 +248,144 @@
           </div>
         </div>
 
+        <!-- VIEW 2: So sánh (before/after slider) -->
+        <div id="viewCompare" class="hidden flex-1 flex flex-col gap-2">
+          <p class="hint">Kéo thanh giữa để so sánh ảnh SketchUp gốc và ảnh render.</p>
+          <div class="compare-wrap flex-1" id="compareWrap">
+            <img id="cmpBefore" class="cmp-base" alt="Gốc SketchUp" />
+            <img id="cmpAfter"  class="cmp-over"  alt="Render AI" />
+            <div class="cmp-divider" id="cmpDivider"><div class="cmp-handle">↔</div></div>
+            <span class="cmp-label" id="cmpLabelBefore" style="left:8px">Gốc (SketchUp)</span>
+            <span class="cmp-label" id="cmpLabelAfter"  style="right:8px">Render (AI)</span>
+          </div>
+        </div>
+
+        <!-- VIEW 3: Điều chỉnh hậu kỳ -->
+        <div id="viewAdjust" class="hidden flex-1 flex flex-col gap-3">
+          <img id="adjImg" class="adj-preview" alt="preview" />
+
+          <!-- Preset màu sắc (miễn phí — xử lý trình duyệt) -->
+          <div>
+            <span class="lbl text-xs mb-1 block">Preset màu sắc <span class="text-slate-500 font-normal">(miễn phí)</span></span>
+            <div class="flex gap-1 flex-wrap" id="colorPresets">
+              <button class="color-preset-btn active" data-preset="natural">Tự nhiên</button>
+              <button class="color-preset-btn" data-preset="film">🎬 Film</button>
+              <button class="color-preset-btn" data-preset="cinematic">🎥 Cinematic</button>
+              <button class="color-preset-btn" data-preset="warm">🌅 Ấm</button>
+              <button class="color-preset-btn" data-preset="cool">❄️ Lạnh</button>
+              <button class="color-preset-btn" data-preset="bw">⬛ B&amp;W</button>
+            </div>
+          </div>
+
+          <!-- AI Gợi ý mood màu -->
+          <div class="border-t border-slate-700 pt-2">
+            <div class="flex items-center gap-2">
+              <label class="lbl text-xs shrink-0">🎨 Mood AI</label>
+              <select id="moodSelect" class="inp flex-1 text-xs py-1"></select>
+              <button id="analyzeMoodBtn" class="btn-secondary text-xs px-3 shrink-0 whitespace-nowrap">✨ Gợi ý <span class="text-slate-400 text-[10px]">(~½ render)</span></button>
+            </div>
+          </div>
+
+          <!-- Sliders thủ công -->
+          <div class="space-y-2">
+            <div class="adj-row">
+              <span>Độ sáng</span>
+              <input type="range" id="adjBrightness" min="50" max="150" value="100" />
+              <span class="adj-val" id="vBr">100</span>
+            </div>
+            <div class="adj-row">
+              <span>Tương phản</span>
+              <input type="range" id="adjContrast" min="50" max="150" value="100" />
+              <span class="adj-val" id="vCo">100</span>
+            </div>
+            <div class="adj-row">
+              <span>Bão hòa màu</span>
+              <input type="range" id="adjSaturate" min="0" max="200" value="100" />
+              <span class="adj-val" id="vSa">100</span>
+            </div>
+            <div class="adj-row">
+              <span>Tone ấm</span>
+              <input type="range" id="adjWarmth" min="0" max="60" value="0" />
+              <span class="adj-val" id="vWa">0</span>
+            </div>
+          </div>
+
+          <!-- Xuất ảnh (miễn phí) -->
+          <div class="border-t border-slate-700 pt-2 space-y-2">
+            <span class="lbl text-xs block">Định dạng xuất <span class="text-slate-500 font-normal">(miễn phí)</span></span>
+            <div class="flex items-center gap-3">
+              <div class="flex gap-1" id="fmtBtns">
+                <button class="fmt-btn active" data-fmt="png">PNG</button>
+                <button class="fmt-btn" data-fmt="jpeg">JPEG</button>
+                <button class="fmt-btn" data-fmt="webp">WebP</button>
+              </div>
+              <span id="qualWrap" class="hidden items-center gap-1">
+                <span class="text-xs text-slate-400">Q:</span>
+                <input id="exportQual" type="range" min="60" max="100" value="90" class="w-20" />
+                <span id="exportQualVal" class="text-amber-400 text-xs font-mono">90</span>
+              </span>
+            </div>
+            <div class="flex gap-2">
+              <button id="downloadAdjBtn" class="btn-primary flex-1 text-xs py-2">⬇️ Tải về (đã chỉnh)</button>
+              <button id="resetAdjBtn" class="btn-secondary px-3 text-xs">↺ Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons (luôn hiển thị khi có kết quả) -->
         <div id="resultActions" class="hidden mt-3 flex flex-wrap gap-2">
-          <a id="downloadBtn" class="btn-secondary" download>⬇️ Tải về</a>
-          <button id="useAsRefBtn" class="btn-secondary">🎯 Dùng làm Reference</button>
-          <button id="toggleMaskBtn" class="btn-secondary">🖌️ Bật/tắt vẽ mask</button>
+          <a id="downloadBtn" class="btn-secondary" download>⬇️ Tải về gốc</a>
+          <button id="useAsRefBtn" class="btn-secondary">🎯 Làm Reference</button>
+          <button id="enhanceBtn" class="btn-secondary" title="Nâng cao chất lượng bằng AI — tốn 1 API call">✨ AI Nâng cao</button>
+          <button id="rebaseRenderBtn" class="btn-secondary hidden" title="Render lại từ ảnh SketchUp gốc với toàn bộ chỉnh sửa đã gộp — tránh lệch hình học do inpaint nhiều lần">🔄 Render lại từ gốc</button>
         </div>
       </div>
 
-      <!-- HẬU KỲ / INPAINT -->
+      <!-- ── HẬU KỲ / INPAINT ── -->
       <div class="card">
-        <h3 class="text-sm font-bold mb-1">🩹 Hậu kỳ — Sửa cục bộ (Inpaint)</h3>
-        <p class="hint">Bật "vẽ mask" rồi bôi lên vùng cần sửa trên ảnh kết quả, sau đó nhập mô tả.</p>
+        <h3 class="text-sm font-bold mb-2">🩹 Hậu kỳ — Sửa cục bộ</h3>
 
-        <div class="flex items-center gap-3 my-3">
-          <label class="text-xs text-slate-300">Cỡ cọ</label>
-          <input id="brushSize" type="range" min="5" max="80" value="30" class="flex-1" />
-          <button id="clearMaskBtn" class="btn-secondary text-xs py-1">🧽 Xóa mask</button>
+        <!-- Chế độ sửa: Vẽ mask / Mô tả văn bản -->
+        <div class="flex gap-2 mb-3">
+          <button id="imMask" class="input-type-btn flex-1 active" data-imode="mask">✍️ Vẽ mask</button>
+          <button id="imText" class="input-type-btn flex-1" data-imode="text">📝 Mô tả văn bản</button>
         </div>
 
-        <textarea id="inpaintInstruction" rows="2" class="inp"
-          placeholder="VD: giữ người áo đỏ quần đen ở chính giữa ảnh, xóa những người khác xung quanh — hoặc: xóa phần gỗ ở chỗ đánh dấu thôi"></textarea>
+        <!-- CHẾ ĐỘ VẼ MASK -->
+        <div id="maskModeWrap">
+          <p class="hint mb-3">Bôi vùng cần sửa trên tab "Kết quả", nhập mô tả rồi bấm sửa.</p>
+          <div class="flex gap-2 mb-3">
+            <button id="drawMaskBtn"  class="mask-btn">🖌️ Vẽ mask</button>
+            <button id="eraseMaskBtn" class="mask-btn">🧹 Tẩy</button>
+            <button id="undoMaskBtn"  class="btn-secondary px-3" title="Hoàn tác (Ctrl+Z)">↩</button>
+            <button id="clearMaskBtn" class="btn-secondary px-3" title="Xóa toàn bộ mask">✕</button>
+          </div>
+          <div class="flex items-center gap-3 mb-3">
+            <label class="text-xs text-slate-300 shrink-0">Cỡ cọ</label>
+            <input id="brushSize" type="range" min="5" max="80" value="30" class="flex-1" />
+            <span class="text-amber-400 text-xs font-mono w-6 text-right" id="brushSizeVal">30</span>
+          </div>
+          <textarea id="inpaintInstruction" rows="2" class="inp"
+            placeholder="VD: xóa phần gỗ ở chỗ đánh dấu — hoặc: thêm đèn chùm vào vị trí đã bôi, giữ nguyên phần còn lại"></textarea>
+          <button id="inpaintBtn" class="btn-primary w-full mt-3" disabled>🩹 SỬA VÙNG ĐÃ CHỌN</button>
+        </div>
 
-        <button id="inpaintBtn" class="btn-primary w-full mt-3" disabled>🩹 SỬA VÙNG ĐÃ CHỌN</button>
+        <!-- CHẾ ĐỘ VĂN BẢN (không cần vẽ) -->
+        <div id="textModeWrap" class="hidden">
+          <p class="hint mb-3">Mô tả chi tiết vị trí và nội dung cần thay đổi. Kết hợp nhiều thay đổi trong 1 mô tả để tiết kiệm API call.</p>
+          <textarea id="textEditInstruction" rows="3" class="inp"
+            placeholder="VD: Thay sàn gỗ trong phòng KHDN và HTTD bằng gạch granite 600x600 màu sáng; giữ nguyên toàn bộ đồ nội thất, màu tường và bố cục..."></textarea>
+          <button id="textEditBtn" class="btn-primary w-full mt-3" disabled>✏️ CHỈNH SỬA THEO MÔ TẢ</button>
+        </div>
+
+        <!-- KẾT QUẢ CHỜ XÁC NHẬN (hiện sau khi text edit xong) -->
+        <div id="editPreviewActions" class="hidden mt-3 gap-2">
+          <button id="applyEditBtn" class="btn-primary flex-1">✅ Áp dụng thay đổi</button>
+          <button id="discardEditBtn" class="btn-secondary flex-1">↺ Giữ nguyên</button>
+        </div>
       </div>
 
-      <!-- LỊCH SỬ -->
+      <!-- ── LỊCH SỬ ── -->
       <div class="card">
         <h3 class="text-sm font-bold mb-2">🕘 Lịch sử phiên</h3>
         <div id="history" class="grid grid-cols-4 gap-2">

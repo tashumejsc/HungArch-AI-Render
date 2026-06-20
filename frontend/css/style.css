@@ -1,5 +1,185 @@
 /* HungArch AI Render — bổ sung cho Tailwind CDN */
 
+/* ───── View tabs (Kết quả / So sánh / Điều chỉnh) ───── */
+.view-tab {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  padding: 0.28rem 0.65rem;
+  border-radius: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: all 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.view-tab.active  { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
+.view-tab:hover:not(.active) { background: #334155; color: #f1f5f9; }
+
+/* ───── Before/After comparison slider ───── */
+.compare-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  cursor: ew-resize;
+  user-select: none;
+  background: #0f172a;
+  max-height: 60vh;
+}
+.compare-wrap .cmp-base {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+}
+.compare-wrap .cmp-over {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  clip-path: inset(0 50% 0 0);
+  pointer-events: none;
+}
+.cmp-divider {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 3px;
+  background: white;
+  left: 50%;
+  cursor: ew-resize;
+  z-index: 10;
+  box-shadow: 0 0 6px rgba(0,0,0,0.6);
+}
+.cmp-handle {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 50%;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; color: #1e293b; font-weight: 900;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+.cmp-label {
+  position: absolute;
+  top: 8px;
+  background: rgba(0,0,0,0.62);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+/* ───── Image-adjustment panel ───── */
+.adj-preview {
+  border-radius: 0.5rem;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  background: #0f172a;
+  display: block;
+}
+.adj-row {
+  display: grid;
+  grid-template-columns: 88px 1fr 38px;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+.adj-row input[type=range] { accent-color: #f59e0b; }
+.adj-val {
+  text-align: right;
+  color: #f59e0b;
+  font-size: 0.7rem;
+  font-family: monospace;
+}
+
+/* ───── Input type toggle (Đen trắng / Đã vật liệu) ───── */
+.input-type-btn {
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  transition: all 0.15s;
+  cursor: pointer;
+  text-align: center;
+}
+.input-type-btn:hover { background: #334155; color: #f1f5f9; }
+.input-type-btn.active { background: rgba(245,158,11,.18); color: #fbbf24; border-color: #f59e0b; }
+
+/* ───── Color preset buttons ───── */
+.color-preset-btn {
+  padding: 0.28rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.color-preset-btn:hover { background: #334155; color: #f1f5f9; }
+.color-preset-btn.active { background: rgba(245,158,11,.18); color: #fbbf24; border-color: #f59e0b; }
+
+/* ───── Export format buttons ───── */
+.fmt-btn {
+  padding: 0.25rem 0.55rem;
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.12s;
+  letter-spacing: 0.03em;
+}
+.fmt-btn:hover { background: #334155; color: #f1f5f9; }
+.fmt-btn.active { background: rgba(16,185,129,.15); color: #34d399; border-color: #10b981; }
+
+/* ───── Mask tool mode buttons ───── */
+.mask-btn {
+  flex: 1;
+  padding: 0.42rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  transition: all 0.15s;
+  cursor: pointer;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+}
+.mask-btn:hover { background: #334155; color: #f1f5f9; }
+.mask-btn.m-draw { background: rgba(245,158,11,.15); color: #fbbf24; border-color: #f59e0b; }
+.mask-btn.m-erase { background: rgba(239,68,68,.15); color: #f87171; border-color: #ef4444; }
+
+/* ───── Mask canvas cursors + active border ───── */
+#maskCanvas.drawing {
+  cursor: crosshair;
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+#maskCanvas.erasing {
+  cursor: cell;
+  outline: 3px solid #ef4444;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .card {
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(71, 85, 105, 0.5);
@@ -112,9 +292,6 @@
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* Mask canvas cursor */
-#maskCanvas.drawing { cursor: crosshair; }
 
 /* History thumbs */
 .history-thumb {

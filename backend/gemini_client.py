@@ -1,14 +1,18 @@
 """Wrapper gọi Google Gemini Image cho HungArch AI Render.
 
-Cung cấp 2 thao tác chính:
-- render():  ảnh SketchUp (+ ảnh tham chiếu tùy chọn) -> ảnh photorealistic.
-- inpaint(): ảnh render + mask + chỉ thị -> sửa cục bộ vùng được đánh dấu.
+Cung cấp 4 thao tác:
+- render():       ảnh SketchUp (+ ảnh tham chiếu tùy chọn) → ảnh photorealistic.
+- enhance():      nâng cao chất lượng ảnh render đã có.
+- inpaint():      sửa cục bộ — mask hoặc mô tả văn bản.
+- analyze_mood(): phân tích ảnh và đề xuất thông số màu (text-only, không sinh ảnh).
 
-Mỗi kết quả được lưu ra outputs/<seed>.png kèm outputs/<seed>.json (metadata).
+Mỗi kết quả ảnh được lưu ra outputs/<token>.png kèm <token>.json (metadata).
 """
 from __future__ import annotations
 
 import io
+import json
+import re
 
 from PIL import Image
 
@@ -17,7 +21,7 @@ from google.genai import types
 
 import config
 import prompts
-from store import RenderResult, new_token, save_result
+from store import RenderResult, save_result
 
 
 class GeminiError(RuntimeError):
@@ -121,7 +125,22 @@ def _generate(model_key: str, parts: list, aspect_ratio: str, resolution: str):
         )
     except GeminiError:
         raise
-    except Exception as exc:  # gói lỗi SDK/mạng thành thông báo gọn
+    except Exception as exc:
+        msg = str(exc)
+        if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+            model_name = config.model_id(model_key)
+            if "limit: 0" in msg or "free_tier" in msg.lower():
+                raise GeminiError(
+                    f"Model '{model_name}' không có hạn mức miễn phí (free tier = 0 request).\n"
+                    "Giải pháp:\n"
+                    "① Bật thanh toán (billing) tại console.cloud.google.com → chọn đúng dự án Google Cloud.\n"
+                    "② Thử chuyển sang model 'Flash 3.1' — rẻ hơn đáng kể so với Pro 3.0.\n"
+                    "③ Kiểm tra hạn mức và chi phí tại aistudio.google.com hoặc console.cloud.google.com."
+                ) from exc
+            raise GeminiError(
+                "Vượt hạn mức Gemini API (429). Đợi 1–2 phút rồi thử lại, "
+                "hoặc chuyển sang model Flash 3.1 để giảm chi phí."
+            ) from exc
         raise GeminiError(f"Lỗi khi gọi Gemini: {exc}") from exc
 
 
@@ -135,10 +154,9 @@ def render(
     reference_mime: str = "image/png",
     model_key: str = config.DEFAULT_MODEL_KEY,
     resolution: str = config.DEFAULT_RESOLUTION,
-    seed: str | None = None,
+    seed: str | None = None,   # không dùng cho Gemini, giữ để tương thích API
 ) -> RenderResult:
     """Biến ảnh khối SketchUp thành ảnh render photorealistic."""
-    seed = seed or new_token()
     aspect = _aspect_from_bytes(image_bytes)
 
     parts: list = [_to_part(image_bytes, image_mime)]
@@ -150,7 +168,7 @@ def render(
 
     response = _generate(model_key, parts, aspect, resolution)
     img = _extract_image(response)
-    return save_result(img, display_seed=seed, prompt_used=full_prompt, meta={
+    return save_result(img, prompt_used=full_prompt, meta={
         "engine": "gemini",
         "mode": mode,
         "model": config.model_id(model_key),
@@ -160,33 +178,132 @@ def render(
     })
 
 
+def enhance(
+    *,
+    image_bytes: bytes,
+    image_mime: str,
+    model_key: str = config.DEFAULT_MODEL_KEY,
+    resolution: str = config.DEFAULT_RESOLUTION,
+    seed: str | None = None,   # không dùng cho Gemini, giữ để tương thích API
+) -> RenderResult:
+    """Nâng cao chất lượng ảnh render: texture sắc nét, PBR chuẩn, lighting tốt hơn.
+
+    Tốn 1 Gemini API call. Chi phí: ~$0.04 (Flash) / ~$0.15 (Pro) mỗi ảnh.
+    """
+    aspect = _aspect_from_bytes(image_bytes)
+    prompt_text = prompts.ENHANCE_PROMPT
+
+    parts = [_to_part(image_bytes, image_mime), prompt_text]
+    response = _generate(model_key, parts, aspect, resolution)
+    img = _extract_image(response)
+    return save_result(img, prompt_used=prompt_text, meta={
+        "engine": "gemini",
+        "mode": "enhance",
+        "model": config.model_id(model_key),
+        "resolution": resolution,
+    })
+
+
 def inpaint(
     *,
     image_bytes: bytes,
     image_mime: str,
-    mask_bytes: bytes,
+    mask_bytes: bytes | None,
     instruction: str,
     model_key: str = config.DEFAULT_MODEL_KEY,
     resolution: str = config.DEFAULT_RESOLUTION,
     seed: str | None = None,
 ) -> RenderResult:
-    """Sửa cục bộ: chỉ chỉnh vùng được đánh dấu (mask magenta), giữ nguyên phần còn lại."""
-    seed = seed or new_token()
-    aspect = _aspect_from_bytes(image_bytes)
-    prompt_text = prompts.build_inpaint_prompt(instruction)
+    """Sửa cục bộ.
 
-    parts = [
-        _to_part(image_bytes, image_mime),
-        _to_part(mask_bytes, "image/png"),
-        prompt_text,
-    ]
+    mask_bytes=None  → chỉnh sửa thuần văn bản (AI hiểu từ nhãn phòng / mô tả).
+    mask_bytes=bytes → chỉnh vùng đánh dấu magenta, giữ nguyên phần còn lại.
+    """
+    aspect = _aspect_from_bytes(image_bytes)
+
+    if mask_bytes is not None:
+        prompt_text = prompts.build_inpaint_prompt(instruction)
+        parts = [
+            _to_part(image_bytes, image_mime),
+            _to_part(mask_bytes, "image/png"),
+            prompt_text,
+        ]
+        edit_mode = "inpaint"
+    else:
+        prompt_text = prompts.build_text_edit_prompt(instruction)
+        parts = [_to_part(image_bytes, image_mime), prompt_text]
+        edit_mode = "text_edit"
+
     response = _generate(model_key, parts, aspect, resolution)
     img = _extract_image(response)
-    return save_result(img, display_seed=seed, prompt_used=prompt_text, meta={
+    return save_result(img, prompt_used=prompt_text, meta={
         "engine": "gemini",
-        "mode": "inpaint",
+        "mode": edit_mode,
         "model": config.model_id(model_key),
         "resolution": resolution,
         "aspect_ratio": aspect,
         "instruction": instruction,
     })
+
+
+def analyze_mood(
+    *,
+    image_bytes: bytes,
+    image_mime: str,
+    mood_key: str,
+    model_key: str = config.DEFAULT_MODEL_KEY,
+) -> dict:
+    """Phân tích ảnh và đề xuất 4 thông số màu cho giao diện hậu kỳ (text-only, không sinh ảnh).
+
+    Trả về dict: {"brightness": int, "contrast": int, "saturate": int, "warmth": int}
+    tương ứng range các slider trong app.js.
+    """
+    client = _get_client()
+    prompt_text = prompts.build_mood_analysis_prompt(mood_key)
+    parts = [_to_part(image_bytes, image_mime), prompt_text]
+
+    try:
+        # Không yêu cầu IMAGE modality — chỉ cần text JSON
+        cfg = types.GenerateContentConfig(response_mime_type="application/json")
+        response = client.models.generate_content(
+            model=config.model_id(model_key),
+            contents=parts,
+            config=cfg,
+        )
+    except Exception:
+        # Fallback: gọi không có config đặc biệt
+        try:
+            response = client.models.generate_content(
+                model=config.model_id(model_key),
+                contents=parts,
+            )
+        except Exception as exc:
+            raise GeminiError(f"Lỗi phân tích mood màu: {exc}") from exc
+
+    text = (getattr(response, "text", None) or "").strip()
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        m = re.search(r'\{[^{}]+\}', text, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group())
+            except Exception:
+                raise GeminiError("AI không trả về đúng định dạng JSON. Thử lại.")
+        else:
+            raise GeminiError("AI không trả về dữ liệu màu hợp lệ. Thử lại với mood khác.")
+
+    required = {"brightness", "contrast", "saturate", "warmth"}
+    if not required.issubset(set(data.keys())):
+        raise GeminiError("Phản hồi AI thiếu trường dữ liệu. Thử lại.")
+
+    # Clamp vào range hợp lệ của từng slider
+    ranges = {"brightness": (70, 130), "contrast": (70, 140), "saturate": (0, 150), "warmth": (0, 50)}
+    result = {}
+    for k, (lo, hi) in ranges.items():
+        try:
+            v = int(round(float(data[k])))
+        except (TypeError, ValueError):
+            raise GeminiError(f"Giá trị '{k}' không hợp lệ trong phản hồi AI.")
+        result[k] = max(lo, min(hi, v))
+    return result
