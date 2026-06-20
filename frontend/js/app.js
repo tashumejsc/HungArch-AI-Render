@@ -366,8 +366,10 @@
         const link = document.createElement('a');
         link.href     = url;
         link.download = `hungarch_adj_${currentResult.seed || 'render'}.${_exportFormat}`;
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 200);
       }, mime, qual);
     };
     img.src = currentResult.url;
@@ -538,8 +540,6 @@
     $('seedValue').textContent = data.seed;
 
     $('resultActions').classList.remove('hidden');
-    $('downloadBtn').href = data.image_url;
-    $('downloadBtn').setAttribute('download', data.image_filename);
     $('inpaintBtn').disabled = false;
     $('textEditBtn').disabled = false;
 
@@ -928,6 +928,23 @@
     $('analyzeMoodBtn').addEventListener('click', doAnalyzeMood);
     $('saveKeysBtn').addEventListener('click', saveKeys);
 
+    $('downloadBtn').addEventListener('click', async () => {
+      if (!currentResult) return;
+      try {
+        const blob = await (await fetch(currentResult.url)).blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = currentResult.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 200);
+      } catch (_) {
+        toast('Không tải được ảnh gốc.', false);
+      }
+    });
+
     $('styleSelect').addEventListener('change', applyStylePlaceholder);
     $('contextSelect').addEventListener('change', applyContextPlaceholder);
 
@@ -942,6 +959,7 @@
     });
     $('eraseMaskBtn').addEventListener('click', () => {
       if (maskTool.drawing && maskTool.erasing) { stopMaskMode(); return; }
+      if (!maskTool.hasMask()) { toast('Hãy dùng 🖌️ Bút vẽ để tô vùng cần sửa trước, rồi dùng Tẩy để xóa bớt.', false); return; }
       setMaskMode('erase');
     });
     $('undoMaskBtn').addEventListener('click', () => {
