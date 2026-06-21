@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**HungArch AI Render v2.1** — local web app for architects that transforms rough SketchUp massing model screenshots into photorealistic renders. Also converts 2D drawings (floor plans, elevations) into 3D perspectives. Runs entirely on the user's machine; internet required only for AI API calls.
+**HungArch AI Render v1.0.0** — local web app for architects that transforms rough SketchUp massing model screenshots into photorealistic renders. Also converts 2D drawings (floor plans, elevations) into 3D perspectives. Runs entirely on the user's machine; internet required only for AI API calls.
 
 ## Running the App
 
@@ -38,38 +38,82 @@ Browser (frontend/) → FastAPI (backend/main.py) → gemini_client.py → store
 
 ### Frontend (`frontend/`)
 
-- **No build step.** Plain HTML + JS + Tailwind CDN.
+- **No build step.** Plain HTML + JS + Tailwind CDN. Cache-busted via `?v=X.X.X` on all script/CSS tags.
 - `api.js` — thin fetch wrapper: `API.getPresets()`, `API.setConfig()`, `API.render()`, `API.inpaint()`, `API.analyzeMood()`, `API.enhance()`.
-- `app.js` — all UI logic. Key functions: `loadPresets()`, `doRender()`, `doInpaint()`, `doTextEdit()`, `doEnhance()`, `doRebaseRender()`, `doAnalyzeMood()`, `showResult()`, `initInpaintModeToggle()`, `initEditPreviewActions()`. State: `originalSourceFile`, `originalRenderParams`, `appliedEdits[]`, `MAX_HISTORY = 30`.
+- `app.js` — all UI logic. Key functions:
+
+| Function | Role |
+|---|---|
+| `loadPresets()` | Fetches `/api/presets`, fills all dropdowns, calls `updateTechSummary()` |
+| `doRender()` | Submits render form; saves `originalSourceFile` / `originalRenderParams`; resets `appliedEdits = []` |
+| `doInpaint()` | Mask-mode: exports canvas → POST to `/api/inpaint` with mask; pushes to `appliedEdits[]` on success |
+| `doTextEdit()` | Text-mode: POST to `/api/inpaint` without mask; shows compare view + `#editPreviewActions` |
+| `doEnhance()` | POST to `/api/enhance`; calls `showResult()` |
+| `doRebaseRender()` | Concatenates `appliedEdits[]` into combined prompt; calls `/api/render` with `originalSourceFile`; resets `appliedEdits = []` |
+| `doAnalyzeMood()` | POST to `/api/analyze-mood`; applies returned JSON to 4 colour sliders via `updateAdj()` |
+| `showResult(data)` | Sets `currentResult`; loads image into canvas + compare + adjust panels; calls `updatePostProcessLock()` |
+| `updateTabDots()` | Shows/hides `.tab-dot` green indicator on each tab button based on `files[TAB_FILE_MAP[tab]]` |
+| `updateTechSummary()` | Updates `#techSummary` text (lighting · model · res) and `#techCostPill` (flash = green ~$0.04, pro = amber ~$0.15) |
+| `updatePostProcessLock()` | Toggles `.section-disabled` on `#postProcessCard` / `#historyCard`; toggles `#postProcessLockNote` visibility — based on `currentResult === null` |
+| `initEditPreviewActions()` | Wires `#applyEditBtn` (updates `currentResult`, calls `updatePostProcessLock()`, pushes to `appliedEdits[]`) and `#discardEditBtn` |
+| `updateAdj()` | Rebuilds CSS filter string; syncs main ↔ mini colour sliders (`#ppBr/Co/Sa/Wa`) |
+
 - `mask.js` — `MaskTool` class: HTML5 Canvas brush draws **magenta** on transparent overlay. `mousemove`/`mouseup` are attached to `document` (not canvas) to prevent stroke interruption when mouse leaves canvas. Opacity 0.68. `exportMaskBlob()` exports magenta-on-black PNG at native resolution.
 
-### Render Tabs
+### Left Column Layout (5 Groups)
 
-**Tab NỘI THẤT (`mode=interior`):** style preset + freetext → `build_interior_prompt()`.
+```
+#keyPanel         <details> — compact strip when closed (padding 0.42rem)
+Tabs row          3 tab-btn with .tab-dot green indicator when image uploaded
+#tab-interior     Upload + style dropdown + prompt textarea
+#tab-exterior     Upload + "Bối cảnh & môi trường" card (context + weather + vegetation)
+#tab-drawing      Upload + drawing type/mode/output controls with branch-flow hints
+.input-type-card  Shared Wireframe / Đã vật liệu toggle (amber border, always visible)
+#techConfig       <details> accordion: reference image, lighting, seed, resolution, model
+                  summary shows: "▶ ⚙️ Cấu hình kỹ thuật [lighting · model · res] [cost pill]"
+#renderBtn        Primary CTA
+```
 
-**Tab NGOẠI THẤT (`mode=exterior`):** context + weather + vegetation + freetext → `build_exterior_prompt()`.
+`#vegetationWrap` lives inside `#tab-exterior` (not the old tech accordion). `updateVegetationVisibility()` still uses `currentTab !== 'exterior'` check — redundant but harmless.
 
-**Tab BẢN VẼ 2D (`mode=drawing`):** Three sub-controls:
-- `drawing_type`: `autocad` | `sketch`
-- `drawing_mode`: `3d_perspective` | `2d_render`
-- `drawing_output`: `interior` | `exterior` (only for `3d_perspective`)
+The input-type toggle (`#itWireframe`/`#itTextured`) must be a **single DOM node** due to unique-ID constraint. It sits between the tab panels and `#techConfig` as a shared card.
 
-`build_drawing_prompt()` dispatches: floor-plan → interior 3D (`DRAWING_TO_3D` prompt), elevation → exterior 3D (`DRAWING_ELEVATION_TO_3D` prompt), or 2D prettification (`DRAWING_TO_2D` prompt).
+### Hậu kỳ / Inpaint — Three Tiers
 
-### Hậu kỳ / Inpaint — Two Modes
+Card `#postProcessCard` (locked with `.section-disabled` until `currentResult` is set).
 
-**Chế độ Vẽ mask:** User draws on canvas → exports magenta-on-black PNG → sent to `/api/inpaint` with `mask` field → `gemini_client.inpaint(mask_bytes=<bytes>)` → `build_inpaint_prompt()`.
+**Tier 1 — Chế độ sửa:**
+- `#imMask` → `data-imode="mask"` — activates `#maskModeWrap`
+- `#imText` → `data-imode="text"` — activates `#textModeWrap`
 
-**Chế độ Mô tả văn bản:** No drawing needed. Only instruction text sent → `/api/inpaint` without `mask` field → `gemini_client.inpaint(mask_bytes=None)` → `build_text_edit_prompt()`. AI reads room labels/layout from the image to understand spatial context.
+**Tier 2A — Mask mode (`#maskModeWrap`):**  
+`div.pp-mask-tools-block` (dark inner block) contains:
+- `#drawMaskBtn` "➕ Thêm vùng chọn" — adds to selection (draw mode)
+- `#eraseMaskBtn` "➖ Bớt vùng chọn" — subtracts from selection (erase mode)
+- `#undoMaskBtn` (↩ icon, 38×38 `.pp-icon-btn`) — undo last stroke
+- `#clearMaskBtn` (🗑 icon, 38×38 `.pp-icon-btn`) — clear entire mask
+- `#brushSize` range slider
 
-**Text-edit result flow:** API returns → compare view shows "Trước chỉnh sửa" / "Sau chỉnh sửa" slider → user clicks **Áp dụng** (updates `currentResult` + mask canvas, pushes to `appliedEdits[]`, shows `rebaseRenderBtn`) or **Giữ nguyên** (dismisses). On next render `showResult()` resets compare labels to "Gốc (SketchUp)" / "Render (AI)".
+Then: `#inpaintInstruction` textarea + `#inpaintBtn` with `<span class="pp-api-note">~1 lần gọi API</span>`.
+
+**Tier 2B — Text mode (`#textModeWrap`):**  
+Hint line + italic note "Không cần vẽ vùng — AI tự xác định vị trí dựa theo mô tả của bạn." + `#textEditInstruction` textarea + `#textEditBtn`.
+
+**`#editPreviewActions`** (hidden by default, shown after `doTextEdit()` succeeds):  
+JS adds `flex` + removes `hidden`. Static class includes `flex-col gap-2` so when flex is added it becomes column layout. Contains: note line → inner `div.flex.gap-2` → `#applyEditBtn` / `#discardEditBtn`.
+
+**Tier 3 — Hành động khác:**  
+3-column grid: `#ppAdjBtn` (toggle `#ppAdjPanel`), `#ppEnhanceBtn` (→`doEnhance`), `#ppRebaseBtn` (→`doRebaseRender`, disabled when `appliedEdits.length === 0`).  
+`#ppAdjPanel` (hidden by default): 4 mini sliders (`#ppBr/Co/Sa/Wa`) that bidirectionally sync with main `#adjBrightness/Contrast/Saturate/Warmth` via `updateAdj()`.
+
+**Section locking:** `#postProcessCard` and `#historyCard` have `.section-disabled` at page load. `updatePostProcessLock()` removes it (and hides `#postProcessLockNote`) as soon as `currentResult` is set by `showResult()` or `applyEditBtn` handler.
 
 ### Render lại từ gốc (C2)
 
-After each inpaint (mask or text), the edit instruction is tracked in `appliedEdits[]`. When `appliedEdits.length > 0`, the **🔄 Render lại từ gốc** button appears. Clicking it calls `doRebaseRender()` which:
-1. Concatenates all edit instructions into `combinedPrompt` appended to the original render prompt.
-2. Calls `/api/render` with the **original SketchUp file** (`originalSourceFile`) and full combined prompt.
-3. Resets `appliedEdits = []` and hides the button on success.
+After each inpaint (mask or text-edit applied), the edit instruction is pushed to `appliedEdits[]`. When `appliedEdits.length > 0`, both `#rebaseRenderBtn` (result area) and `#ppRebaseBtn` (Tier 3) become enabled. `doRebaseRender()`:
+1. Concatenates all `appliedEdits[].instruction` into `combinedPrompt` appended to `originalRenderParams.prompt`.
+2. Calls `/api/render` with `originalSourceFile` (the original SketchUp file, not the inpainted image).
+3. Resets `appliedEdits = []` and disables both rebase buttons on success.
 
 This prevents cumulative geometry drift from repeated inpaints on already-inpainted images.
 
@@ -85,13 +129,23 @@ This prevents cumulative geometry drift from repeated inpaints on already-inpain
 
 **Inpaint mask format:** Frontend draws magenta (`#ff00ff`). Backend receives magenta-on-black PNG; the prompt instructs Gemini to edit only the magenta-marked region.
 
-**Error messages:** All errors translated to Vietnamese via `viError()` in `app.js`. Error toasts display for 10 s (vs 3.5 s for success) to give time to read. 429 errors suggest billing/model/console — no longer mentions Replicate (removed).
+**Error messages:** All errors translated to Vietnamese via `viError()` in `app.js`. Error toasts display for 10 s (vs 3.5 s for success). 429 errors suggest billing/model/console.
 
 **Compare view labels:** `cmpLabelBefore` / `cmpLabelAfter` are dynamic — set to "Trước/Sau chỉnh sửa" during text-edit preview, reset to "Gốc/Render" by `showResult()` on each new render.
 
 **History cap:** `MAX_HISTORY = 30` — `addHistory()` calls `history.splice(MAX_HISTORY)` after push.
 
 **analyze_mood JSON parsing:** defensive — tries `GenerateContentConfig(response_mime_type="application/json")`, fallback regex `\{[^{}]+\}`, validates all 4 required fields, clamps to defined ranges before returning.
+
+**`.section-disabled` lock pattern:** `opacity: 0.4; pointer-events: none` applied to `#postProcessCard` and `#historyCard` at init. Removed by `updatePostProcessLock()` after first successful render. `#postProcessLockNote` (a `<p>`) toggles opposite — visible when locked.
+
+**Tech accordion summary:** `#techConfig` is a `<details>` element. CSS hides default browser disclosure triangle (`::-webkit-details-marker` + `::marker`), replaces with `▶`/`▼` via `::before`. `updateTechSummary()` writes to `#techSummary` span and `#techCostPill` (colour-coded by model).
+
+**`editPreviewActions` flex layout:** The div has static class `flex-col gap-2`. JS adds `flex` (removes `hidden`) to display it — making it `flex flex-col gap-2` so the note line stacks above the button row (which lives in an inner `div.flex.gap-2`).
+
+**`btn-primary:disabled` style:** Uses grey `background: #334155` with `opacity: 0.6` (not the default faded gradient) so disabled state is clearly distinct from active state. Both `#inpaintBtn` and `#textEditBtn` use this automatically.
+
+**Tab file map:** `TAB_FILE_MAP = { interior: 'interiorImage', exterior: 'exteriorImage', drawing: 'drawingImage' }` — used by `updateTabDots()` to check which tabs have uploaded images.
 
 ## Adding New Presets
 
@@ -114,4 +168,4 @@ Same pattern for `EXTERIOR_CONTEXTS`, `EXTERIOR_WEATHER`, `LIGHTING_PRESETS`, `V
 - **Gemini image models have free tier = 0.** All Gemini image generation requires billing enabled on the Google Cloud project. `analyze_mood` uses text-only mode and is cheaper (~¼–½ of a render call).
 - **`gemini-2.5-*-preview` models do NOT support IMAGE response modality** — they return 404. Only use models explicitly listed in `config.py`. `analyze_mood()` uses text-only so it can use any model, but for consistency uses the same model keys.
 - Python 3.14 compatibility: `requirements.txt` uses `>=` (not pinned `==`) intentionally.
-- Replicate is fully removed (v2.1). `replicate_client.py` deleted; no Replicate constants in `prompts.py` or `requirements.txt`.
+- Replicate is fully removed. `replicate_client.py` deleted; no Replicate constants in `prompts.py` or `requirements.txt`.
