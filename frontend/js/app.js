@@ -75,6 +75,19 @@
   }
 
   // ══════════════════════════════════════════════
+  //  Tab dots — chấm xanh khi đã upload ảnh
+  // ══════════════════════════════════════════════
+  const TAB_FILE_MAP = { interior: 'interiorImage', exterior: 'exteriorImage', drawing: 'drawingImage' };
+
+  function updateTabDots() {
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      const dot = btn.querySelector('.tab-dot');
+      if (!dot) return;
+      dot.classList.toggle('hidden', !files[TAB_FILE_MAP[btn.dataset.tab]]);
+    });
+  }
+
+  // ══════════════════════════════════════════════
   //  Dropzones
   // ══════════════════════════════════════════════
   function initDropzones() {
@@ -89,6 +102,7 @@
         img.src = URL.createObjectURL(file);
         img.classList.remove('hidden');
         ph.classList.add('hidden');
+        updateTabDots();
       };
 
       dz.addEventListener('click', () => input.click());
@@ -299,6 +313,11 @@
     $('vCo').textContent = $('adjContrast').value;
     $('vSa').textContent = $('adjSaturate').value;
     $('vWa').textContent = $('adjWarmth').value;
+    // Sync mini panel sliders (Tầng 3)
+    [['ppBr','ppBrVal','adjBrightness'],['ppCo','ppCoVal','adjContrast'],
+     ['ppSa','ppSaVal','adjSaturate'], ['ppWa','ppWaVal','adjWarmth']].forEach(([pp,pv,main]) => {
+      const el = $(pp); if (el) { el.value = $(main).value; $(pv).textContent = $(main).value; }
+    });
   }
 
   function resetAdj() {
@@ -312,6 +331,11 @@
     document.querySelectorAll('.color-preset-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.preset === 'natural')
     );
+    // Sync mini panel sliders về default
+    [['ppBr','ppBrVal','adjBrightness'],['ppCo','ppCoVal','adjContrast'],
+     ['ppSa','ppSaVal','adjSaturate'], ['ppWa','ppWaVal','adjWarmth']].forEach(([pp,pv,main]) => {
+      const el = $(pp); if (el) { el.value = $(main).value; $(pv).textContent = $(main).value; }
+    });
   }
 
   function initAdjust() {
@@ -426,6 +450,27 @@
     $('vegetationWrap').classList.toggle('hidden', currentTab !== 'exterior');
   }
 
+  // ══════════════════════════════════════════════
+  //  Tech accordion summary (lighting · model · resolution + cost)
+  // ══════════════════════════════════════════════
+  function updateTechSummary() {
+    const lSel = $('lightingSelect');
+    const mSel = $('modelSelect');
+    const rSel = $('resolutionSelect');
+    const lighting = lSel?.options[lSel.selectedIndex]?.text || '';
+    const model    = mSel?.options[mSel.selectedIndex]?.text || '';
+    const res      = rSel?.value || '';
+    const techSum  = $('techSummary');
+    const costPill = $('techCostPill');
+    if (techSum) techSum.textContent = [lighting, model, res].filter(Boolean).join(' · ');
+    if (costPill) {
+      const isFlash = (mSel?.value || '').includes('flash');
+      costPill.textContent  = isFlash ? '~$0.04/ảnh' : '~$0.15/ảnh';
+      costPill.className = 'ml-auto text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ' +
+        (isFlash ? 'bg-emerald-900/50 text-emerald-400' : 'bg-amber-900/50 text-amber-400');
+    }
+  }
+
   function applyStylePlaceholder() {
     const ph = stylePlaceholders[$('styleSelect').value];
     if (ph) $('interiorPrompt').placeholder = ph;
@@ -468,6 +513,7 @@
       if (p.mood_presets) fillSelect($('moodSelect'), p.mood_presets);
 
       updateVegetationVisibility();
+      updateTechSummary();
       applyStatus(p);
     } catch (e) {
       toast(e.message, false);
@@ -545,6 +591,7 @@
 
     switchToView('viewResult');
     addHistory(data);
+    updatePostProcessLock();
   }
 
   function addHistory(data) {
@@ -598,6 +645,7 @@
     };
     appliedEdits = [];
     $('rebaseRenderBtn').classList.add('hidden');
+    if ($('ppRebaseBtn')) $('ppRebaseBtn').disabled = true;
 
     const fd = new FormData();
     fd.append('mode',       currentTab);
@@ -686,6 +734,7 @@
       if (originalSourceFile) {
         appliedEdits.push({ type: 'mask', instruction });
         $('rebaseRenderBtn').classList.remove('hidden');
+        if ($('ppRebaseBtn')) $('ppRebaseBtn').disabled = false;
       }
     } catch (e) {
       toast(e.message, false);
@@ -753,6 +802,7 @@
         filename:  data.image_filename,
         beforeUrl: null,
       };
+      updatePostProcessLock();
       $('maskCanvas').classList.remove('hidden');
       await maskTool.load(data.image_url);
       stopMaskMode();
@@ -763,8 +813,6 @@
       $('seedBadge').classList.remove('hidden');
       $('seedBadge').classList.add('flex');
       $('seedValue').textContent = data.seed;
-      $('downloadBtn').href = data.image_url;
-      $('downloadBtn').setAttribute('download', data.image_filename);
       $('inpaintBtn').disabled  = false;
       $('textEditBtn').disabled = false;
 
@@ -776,6 +824,7 @@
       if (originalSourceFile && _pendingEditInstruction) {
         appliedEdits.push({ type: 'text', instruction: _pendingEditInstruction });
         $('rebaseRenderBtn').classList.remove('hidden');
+        if ($('ppRebaseBtn')) $('ppRebaseBtn').disabled = false;
       }
       _pendingEditInstruction = null;
 
@@ -806,6 +855,7 @@
 
     setLoading(true, '✨ AI đang nâng cao chất lượng ảnh…');
     $('enhanceBtn').disabled = true;
+    if ($('ppEnhanceBtn')) $('ppEnhanceBtn').disabled = true;
     try {
       const data    = await API.enhance(fd);
       pendingBeforeUrl = currentResult.url;
@@ -816,6 +866,7 @@
     } finally {
       setLoading(false);
       $('enhanceBtn').disabled = false;
+      if ($('ppEnhanceBtn')) $('ppEnhanceBtn').disabled = false;
     }
   }
 
@@ -873,6 +924,7 @@
       const data = await API.render(fd);
       appliedEdits = [];
       $('rebaseRenderBtn').classList.add('hidden');
+      if ($('ppRebaseBtn')) $('ppRebaseBtn').disabled = true;
       await showResult(data);
       toast(`Render lại xong từ ảnh gốc! Seed: ${data.seed}`);
     } catch (e) {
@@ -917,6 +969,16 @@
   }
 
   // ══════════════════════════════════════════════
+  //  Khóa / mở khóa khối hậu kỳ + lịch sử
+  // ══════════════════════════════════════════════
+  function updatePostProcessLock() {
+    const locked = currentResult === null;
+    $('postProcessCard').classList.toggle('section-disabled', locked);
+    $('historyCard').classList.toggle('section-disabled', locked);
+    $('postProcessLockNote').classList.toggle('hidden', !locked);
+  }
+
+  // ══════════════════════════════════════════════
   //  Wire up all events
   // ══════════════════════════════════════════════
   function initActions() {
@@ -947,6 +1009,10 @@
 
     $('styleSelect').addEventListener('change', applyStylePlaceholder);
     $('contextSelect').addEventListener('change', applyContextPlaceholder);
+    // Tech summary cập nhật khi đổi lighting / model / resolution
+    ['lightingSelect', 'modelSelect', 'resolutionSelect'].forEach((id) => {
+      $(id).addEventListener('change', updateTechSummary);
+    });
 
     $('brushSize').addEventListener('input', (e) => {
       maskTool.setBrush(e.target.value);
@@ -959,7 +1025,7 @@
     });
     $('eraseMaskBtn').addEventListener('click', () => {
       if (maskTool.drawing && maskTool.erasing) { stopMaskMode(); return; }
-      if (!maskTool.hasMask()) { toast('Hãy dùng 🖌️ Bút vẽ để tô vùng cần sửa trước, rồi dùng Tẩy để xóa bớt.', false); return; }
+      if (!maskTool.hasMask()) { toast('Hãy dùng ➕ Thêm vùng chọn để tô vùng cần sửa trước, rồi dùng ➖ Bớt để xóa bớt.', false); return; }
       setMaskMode('erase');
     });
     $('undoMaskBtn').addEventListener('click', () => {
@@ -992,6 +1058,26 @@
       dz.querySelector('.ph').classList.add('hidden');
       toast('Đã đặt ảnh này làm Reference cho góc tiếp theo.');
     });
+
+    // ── Tầng 3: Quick actions ──
+    $('ppAdjBtn').addEventListener('click', () => {
+      if (!currentResult) { toast('Hãy render ảnh trước.', false); return; }
+      const panel = $('ppAdjPanel');
+      panel.classList.toggle('hidden');
+      $('ppAdjBtn').classList.toggle('active', !panel.classList.contains('hidden'));
+    });
+    $('ppEnhanceBtn').addEventListener('click', doEnhance);
+    $('ppRebaseBtn').addEventListener('click', doRebaseRender);
+
+    // Mini sliders → sync về main sliders (state luôn ở main)
+    [['ppBr','adjBrightness'],['ppCo','adjContrast'],
+     ['ppSa','adjSaturate'], ['ppWa','adjWarmth']].forEach(([pp, main]) => {
+      $(pp).addEventListener('input', (e) => {
+        $(main).value = e.target.value;
+        document.querySelectorAll('.color-preset-btn').forEach((b) => b.classList.remove('active'));
+        updateAdj();
+      });
+    });
   }
 
   // ══════════════════════════════════════════════
@@ -1011,6 +1097,8 @@
     initInpaintModeToggle();
     initEditPreviewActions();
     initActions();
+    updateTabDots();
+    updatePostProcessLock();
     loadPresets();
   });
 })();
