@@ -221,7 +221,7 @@ def get_status() -> dict:
         "days_remaining": 0,
         "expiry": None,
         "machine_id": mid_display,
-        "message": "Hết hạn dùng thử. Liên hệ tashume.jsc@gmail.com để kích hoạt.",
+        "message": "Hết hạn dùng thử. Liên hệ Zalo 0903230616 để kích hoạt.",
     }
 
 

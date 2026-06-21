@@ -988,7 +988,7 @@
       } else if (s.mode === 'trial') {
         // Hiện banner nhỏ
         const msg = $('trialMsg');
-        if (msg) msg.textContent = `⏳ Đang dùng thử — còn ${s.days_remaining} ngày. Liên hệ tashume.jsc@gmail.com để kích hoạt bản quyền đầy đủ.`;
+        if (msg) msg.textContent = `⏳ Đang dùng thử — còn ${s.days_remaining} ngày. Liên hệ Zalo 0903230616 để kích hoạt bản quyền đầy đủ.`;
         if (banner) banner.classList.remove('hidden');
         if (modal)  modal.classList.add('hidden');
 
