@@ -4,3 +4,4 @@ google-genai>=1.38
 python-multipart>=0.0.20
 pillow>=11.1
 python-dotenv>=1.0
+cryptography>=42.0

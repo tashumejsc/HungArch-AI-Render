@@ -1,12 +1,14 @@
-"""HungArch AI Render — FastAPI app (Gemini-only, v2.1).
+"""HungArch AI Render — FastAPI app (Gemini-only, v1.0.0).
 
-6 endpoint API:
-  GET  /api/presets       — danh sách preset + model cho frontend
-  POST /api/config        — lưu API key
-  POST /api/render        — render ảnh SketchUp → photorealistic
-  POST /api/inpaint       — sửa cục bộ (mask hoặc mô tả văn bản)
-  POST /api/analyze-mood  — đề xuất thông số colour-grading (text-only, không sinh ảnh)
-  POST /api/enhance       — nâng cao chất lượng ảnh render đã có (AI upscale)
+8 endpoint API:
+  GET  /api/presets        — danh sách preset + model cho frontend
+  POST /api/config         — lưu API key
+  GET  /api/license        — trạng thái license (trial / licensed / expired)
+  POST /api/license/activate — kích hoạt bằng license key
+  POST /api/render         — render ảnh SketchUp → photorealistic
+  POST /api/inpaint        — sửa cục bộ (mask hoặc mô tả văn bản)
+  POST /api/analyze-mood   — đề xuất thông số colour-grading (text-only)
+  POST /api/enhance        — nâng cao chất lượng ảnh render đã có (AI upscale)
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from pydantic import BaseModel
 
 import config
 import gemini_client
+import license as lic
 import prompts
 
 
@@ -24,7 +27,35 @@ class KeyConfig(BaseModel):
     gemini_api_key: str | None = None
 
 
-app = FastAPI(title="HungArch AI Render", version="2.0.0")
+app = FastAPI(title="HungArch AI Render", version="1.0.0")
+
+
+def _require_license() -> None:
+    """Ném 403 nếu hết hạn — gọi ở đầu mỗi endpoint sinh ảnh."""
+    status = lic.get_status()
+    if status["mode"] == "expired":
+        raise HTTPException(
+            status_code=403,
+            detail="Hết hạn dùng thử. Nhập license key trong mục 🔑 để tiếp tục.",
+        )
+
+
+# ── License ───────────────────────────────────────────────────────────────────
+@app.get("/api/license")
+def get_license():
+    return JSONResponse(lic.get_status())
+
+
+class ActivateBody(BaseModel):
+    key: str
+
+
+@app.post("/api/license/activate")
+def activate_license(body: ActivateBody):
+    result = lic.activate(body.key.strip())
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return JSONResponse(result)
 
 
 # ── Presets ───────────────────────────────────────────────────────────────────
@@ -71,6 +102,7 @@ async def api_render(
     vegetation: str = Form("moderate"),
     reference_image: UploadFile | None = File(None),
 ):
+    _require_license()
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Thiếu ảnh đầu vào.")
@@ -134,6 +166,7 @@ async def api_inpaint(
     resolution: str = Form(config.DEFAULT_RESOLUTION),
     seed: str = Form(""),
 ):
+    _require_license()
     image_bytes = await image.read()
     mask_bytes = (await mask.read()) if mask else None
     if not image_bytes:
@@ -171,6 +204,7 @@ async def api_analyze_mood(
 
     Rẻ hơn đáng kể so với render/enhance vì chỉ dùng Gemini text-only mode.
     """
+    _require_license()
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Thiếu ảnh đầu vào.")
@@ -197,6 +231,7 @@ async def api_enhance(
     """Nâng cao chất lượng ảnh render: texture sắc nét, PBR chuẩn, lighting tốt hơn.
     Tốn 1 Gemini API call (~$0.04–0.15 tùy model).
     """
+    _require_license()
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Thiếu ảnh đầu vào.")

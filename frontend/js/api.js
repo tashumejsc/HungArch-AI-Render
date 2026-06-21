@@ -44,4 +44,21 @@ const API = {
     if (!r.ok) throw new Error(data.detail || 'Lỗi khi phân tích mood màu.');
     return data;
   },
+
+  async getLicense() {
+    const r = await fetch('/api/license');
+    if (!r.ok) throw new Error('Không kiểm tra được license.');
+    return r.json();
+  },
+
+  async activateLicense(key) {
+    const r = await fetch('/api/license/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || 'Kích hoạt thất bại.');
+    return data;
+  },
 };

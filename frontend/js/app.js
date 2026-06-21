@@ -969,6 +969,90 @@
   }
 
   // ══════════════════════════════════════════════
+  //  License
+  // ══════════════════════════════════════════════
+  async function checkLicense() {
+    try {
+      const s = await API.getLicense();
+      const banner = $('trialBanner');
+      const modal  = $('licenseModal');
+      const midEl  = $('machineIdDisplay');
+
+      if (midEl) midEl.textContent = s.machine_id || '----';
+
+      if (s.mode === 'licensed') {
+        // Không cần hiện gì — ẩn hết
+        if (banner) banner.classList.add('hidden');
+        if (modal)  modal.classList.add('hidden');
+
+      } else if (s.mode === 'trial') {
+        // Hiện banner nhỏ
+        const msg = $('trialMsg');
+        if (msg) msg.textContent = `⏳ Đang dùng thử — còn ${s.days_remaining} ngày. Liên hệ tashume.jsc@gmail.com để kích hoạt bản quyền đầy đủ.`;
+        if (banner) banner.classList.remove('hidden');
+        if (modal)  modal.classList.add('hidden');
+
+      } else {
+        // expired — hiện modal chặn, ẩn banner
+        if (banner) banner.classList.add('hidden');
+        const msgEl = $('licenseModalMsg');
+        if (msgEl) msgEl.textContent = s.message || 'Hết hạn dùng thử.';
+        if (modal)  modal.classList.remove('hidden');
+        // Nút "Đóng" không hiện khi hết hạn — chỉ hiện khi mở từ trial banner
+        const closeBtn = $('licenseModalClose');
+        if (closeBtn) closeBtn.classList.add('hidden');
+      }
+    } catch (_) { /* Không block app nếu kiểm tra license lỗi */ }
+  }
+
+  function initLicense() {
+    // Banner: bấm "Kích hoạt" → mở modal (có nút Đóng vì vẫn còn trial)
+    $('trialActivateBtn')?.addEventListener('click', () => {
+      $('licenseModalClose')?.classList.remove('hidden');
+      $('licenseModal')?.classList.remove('hidden');
+    });
+
+    // Banner: bấm × → ẩn banner
+    $('trialDismissBtn')?.addEventListener('click', () => {
+      $('trialBanner')?.classList.add('hidden');
+    });
+
+    // Modal: bấm Đóng (chỉ khi còn trial)
+    $('licenseModalClose')?.addEventListener('click', () => {
+      $('licenseModal')?.classList.add('hidden');
+    });
+
+    // Modal: kích hoạt key
+    $('activateLicenseBtn')?.addEventListener('click', async () => {
+      const key = $('licenseKeyInput')?.value.trim();
+      const errEl = $('activateError');
+      if (!key) { if (errEl) { errEl.textContent = 'Hãy nhập license key.'; errEl.classList.remove('hidden'); } return; }
+
+      const btn = $('activateLicenseBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Đang xác thực…';
+      if (errEl) errEl.classList.add('hidden');
+
+      try {
+        const res = await API.activateLicense(key);
+        toast(res.message || 'Kích hoạt thành công!');
+        $('licenseModal')?.classList.add('hidden');
+        $('trialBanner')?.classList.add('hidden');
+      } catch (e) {
+        if (errEl) { errEl.textContent = e.message; errEl.classList.remove('hidden'); }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✅ Kích hoạt';
+      }
+    });
+
+    // Cho phép Enter trong ô input
+    $('licenseKeyInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('activateLicenseBtn')?.click();
+    });
+  }
+
+  // ══════════════════════════════════════════════
   //  Khóa / mở khóa khối hậu kỳ + lịch sử
   // ══════════════════════════════════════════════
   function updatePostProcessLock() {
@@ -1099,6 +1183,8 @@
     initActions();
     updateTabDots();
     updatePostProcessLock();
+    initLicense();
+    checkLicense();
     loadPresets();
   });
 })();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HungArch AI Render</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/css/style.css?v=1.0.5" />
+  <link rel="stylesheet" href="/css/style.css?v=1.0.6" />
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
@@ -20,6 +20,15 @@
       <span id="apiStatus" class="ml-auto text-xs px-2 py-1 rounded-full bg-slate-700 text-slate-300">đang kiểm tra…</span>
     </div>
   </header>
+
+  <!-- Banner dùng thử (hiện khi mode=trial) -->
+  <div id="trialBanner" class="hidden bg-amber-900/40 border-b border-amber-500/30">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3 text-sm">
+      <span id="trialMsg" class="text-amber-300 flex-1"></span>
+      <button id="trialActivateBtn" class="text-xs px-3 py-1 rounded-full bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition">Kích hoạt bản quyền</button>
+      <button id="trialDismissBtn" class="text-slate-400 hover:text-slate-200 text-lg leading-none">×</button>
+    </div>
+  </div>
 
   <main class="max-w-7xl mx-auto px-4 py-6 grid lg:grid-cols-2 gap-6">
 
@@ -458,10 +467,40 @@
     </section>
   </main>
 
+  <!-- Modal kích hoạt (hiện khi mode=expired hoặc bấm "Kích hoạt") -->
+  <div id="licenseModal" class="hidden fixed inset-0 z-50 bg-slate-900/95 flex items-center justify-center">
+    <div class="card max-w-md w-full mx-4 border-amber-500/50 space-y-4">
+      <div class="text-center">
+        <div class="text-4xl mb-2">🔐</div>
+        <h2 class="text-lg font-bold text-amber-400">Kích hoạt HungArch AI Render</h2>
+        <p id="licenseModalMsg" class="text-sm text-slate-400 mt-1">Thời gian dùng thử đã hết.</p>
+      </div>
+
+      <div class="bg-slate-800 rounded-lg p-3 text-center space-y-1">
+        <p class="text-xs text-slate-400">Mã máy của bạn (gửi cho Tashume để nhận key)</p>
+        <p id="machineIdDisplay" class="text-lg font-mono font-bold text-amber-400 tracking-widest">----</p>
+        <p class="text-xs text-slate-500">tashume.jsc@gmail.com</p>
+      </div>
+
+      <div class="space-y-2">
+        <label class="lbl">Nhập license key</label>
+        <input id="licenseKeyInput" type="text" class="inp font-mono text-sm tracking-wider"
+          placeholder="HUNG-XXXXX-XXXXX-XXXXX-…" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <button id="activateLicenseBtn" class="btn-primary w-full">✅ Kích hoạt</button>
+      <p id="activateError" class="hidden text-red-400 text-xs text-center"></p>
+
+      <button id="licenseModalClose" class="hidden w-full text-xs text-slate-500 hover:text-slate-300 transition">
+        Đóng (tiếp tục dùng thử)
+      </button>
+    </div>
+  </div>
+
   <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden px-4 py-2 rounded-lg text-sm shadow-lg z-50"></div>
 
-  <script src="/js/api.js?v=1.0.5"></script>
-  <script src="/js/mask.js?v=1.0.5"></script>
-  <script src="/js/app.js?v=1.0.5"></script>
+  <script src="/js/api.js?v=1.0.6"></script>
+  <script src="/js/mask.js?v=1.0.6"></script>
+  <script src="/js/app.js?v=1.0.6"></script>
 </body>
 </html>
