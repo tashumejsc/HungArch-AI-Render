@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn cài đặt — HungArch AI Render</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    line-height: 1.7;
+    padding: 0 0 60px;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-bottom: 2px solid #f59e0b;
+    padding: 32px 0 28px;
+    text-align: center;
+  }
+  .header .logo {
+    display: inline-flex; align-items: center; gap: 14px;
+    margin-bottom: 8px;
+  }
+  .header .logo-icon {
+    width: 52px; height: 52px; border-radius: 12px;
+    background: #f59e0b;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 900; color: #0f172a;
+  }
+  .header h1 { font-size: 28px; color: #f59e0b; font-weight: 700; }
+  .header p  { color: #94a3b8; font-size: 15px; margin-top: 4px; }
+
+  /* ── Layout ── */
+  .container { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Section ── */
+  .section {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-top: 28px;
+    border: 1px solid #334155;
+  }
+  .section-title {
+    font-size: 18px; font-weight: 700; color: #f59e0b;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 20px; padding-bottom: 12px;
+    border-bottom: 1px solid #334155;
+  }
+  .section-title .num {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #f59e0b; color: #0f172a;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 900; flex-shrink: 0;
+  }
+
+  /* ── Steps ── */
+  .step {
+    display: flex; gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid #1e3a5f22;
+  }
+  .step:last-child { border-bottom: none; }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: #0f172a; border: 2px solid #f59e0b;
+    color: #f59e0b; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .step-body { flex: 1; }
+  .step-body strong { color: #f8fafc; }
+  .step-body p { color: #94a3b8; font-size: 14px; margin-top: 4px; }
+
+  /* ── Code / note ── */
+  .note {
+    background: #0f172a;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 14px; color: #94a3b8;
+  }
+  .note strong { color: #fbbf24; }
+
+  .code-block {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    color: #86efac;
+    margin: 10px 0;
+    word-break: break-all;
+  }
+
+  /* ── Machine ID box ── */
+  .mid-demo {
+    background: #0f172a;
+    border: 2px dashed #f59e0b;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin: 16px 0;
+  }
+  .mid-demo .mid-value {
+    font-family: Consolas, monospace;
+    font-size: 28px; font-weight: 700;
+    color: #f59e0b; letter-spacing: 4px;
+    margin: 8px 0;
+  }
+  .mid-demo p { color: #64748b; font-size: 13px; }
+
+  /* ── Requirement tags ── */
+  .req-list { display: flex; flex-direction: column; gap: 10px; }
+  .req-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: #0f172a; border-radius: 8px; padding: 12px 16px;
+  }
+  .req-icon { font-size: 22px; flex-shrink: 0; }
+  .req-item strong { color: #f8fafc; display: block; }
+  .req-item span { color: #94a3b8; font-size: 13px; }
+
+  /* ── Warning / tip ── */
+  .tip {
+    background: #1c2c1a; border: 1px solid #166534;
+    border-radius: 8px; padding: 14px 18px;
+    font-size: 14px; color: #86efac; margin: 14px 0;
+  }
+  .warn {
+    background: #2a1a0e; border: 1px solid #92400e;
+    border-radius: 8px; padding: 14px 18px;
+    font-size: 14px; color: #fbbf24; margin: 14px 0;
+  }
+
+  /* ── Contact ── */
+  .contact {
+    text-align: center;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 28px;
+    margin-top: 28px;
+  }
+  .contact h3 { color: #f8fafc; font-size: 18px; margin-bottom: 8px; }
+  .contact .zalo {
+    font-size: 26px; font-weight: 700; color: #f59e0b;
+    letter-spacing: 2px; margin: 10px 0;
+  }
+  .contact p { color: #64748b; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">H</div>
+    <div>
+      <h1>HungArch AI Render</h1>
+    </div>
+  </div>
+  <p>Biến khối SketchUp thành ảnh diễn họa chân thực bằng AI · Giữ nguyên hình học</p>
+</div>
+
+<div class="container">
+
+  <!-- ── BƯỚC 0: Yêu cầu ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="num">✓</span>
+      Yêu cầu trước khi cài đặt
+    </div>
+    <div class="req-list">
+      <div class="req-item">
+        <span class="req-icon">🐍</span>
+        <div>
+          <strong>Python 3.10 trở lên</strong>
+          <span>Tải tại <b>python.org/downloads</b> — khi cài nhớ tích ô
+            <b>"Add Python to PATH"</b> ở màn hình đầu tiên.</span>
+        </div>
+      </div>
+      <div class="req-item">
+        <span class="req-icon">🌐</span>
+        <div>
+          <strong>Kết nối Internet</strong>
+          <span>Cần để gọi API Google Gemini mỗi lần render. Không cần GPU.</span>
+        </div>
+      </div>
+      <div class="req-item">
+        <span class="req-icon">🔑</span>
+        <div>
+          <strong>Gemini API Key (Google AI Studio)</strong>
+          <span>Truy cập <b>aistudio.google.com/apikey</b> → tạo key miễn phí.
+            Lưu ý: tính năng tạo ảnh yêu cầu bật Billing trên Google Cloud
+            (khoảng $0.04–0.15 / ảnh).</span>
+        </div>
+      </div>
+    </div>
+    <div class="warn" style="margin-top:16px;">
+      ⚠️ <strong>Quan trọng khi cài Python:</strong> Nếu bỏ qua ô "Add Python to PATH",
+      app sẽ không chạy được. Gỡ cài đặt và cài lại nếu cần.
+    </div>
+  </div>
+
+  <!-- ── BƯỚC 1: Giải nén ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="num">1</span>
+      Giải nén và chuẩn bị
+    </div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Giải nén file ZIP</strong>
+        <p>Click chuột phải vào <b>HungArch_AI_Render_v1.0.0.zip</b>
+          → <b>Extract All</b> → chọn thư mục bất kỳ (ví dụ: <code>D:\HungArch</code>).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Mở thư mục vừa giải nén</strong>
+        <p>Bên trong bạn thấy các file: <code>run.bat</code>, <code>backend/</code>,
+          <code>frontend/</code>, <code>README.md</code>...</p>
+      </div>
+    </div>
+    <div class="tip">
+      💡 Không cài đặt thêm bất cứ thứ gì — <b>run.bat</b> tự động cài tất cả thư viện
+      cần thiết trong lần chạy đầu tiên.
+    </div>
+  </div>
+
+  <!-- ── BƯỚC 2: Chạy app ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="num">2</span>
+      Chạy ứng dụng
+    </div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Double-click vào file <code>run.bat</code></strong>
+        <p>Một cửa sổ đen (Command Prompt) hiện lên — đây là bình thường,
+          <b>đừng đóng cửa sổ này</b> trong khi dùng app.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Chờ lần đầu cài thư viện</strong>
+        <p>Lần đầu chạy mất <b>2–5 phút</b> để tải thư viện. Các lần sau chỉ mất
+          vài giây. Trình duyệt tự mở khi sẵn sàng.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Trình duyệt mở <code>http://localhost:8000</code></strong>
+        <p>Nếu trình duyệt không tự mở, gõ địa chỉ trên vào thanh địa chỉ của Chrome / Edge.</p>
+      </div>
+    </div>
+    <div class="note">
+      <strong>Muốn tắt app:</strong> Đóng cửa sổ đen (Command Prompt) hoặc nhấn
+      <b>Ctrl + C</b> bên trong đó. Đóng trình duyệt không tắt server.
+    </div>
+  </div>
+
+  <!-- ── BƯỚC 3: Nhập API Key ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="num">3</span>
+      Nhập Gemini API Key (lần đầu)
+    </div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Truy cập aistudio.google.com/apikey</strong>
+        <p>Đăng nhập bằng tài khoản Google → bấm <b>"Create API Key"</b>
+          → copy key (dạng <code>AIza...</code>).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Dán key vào app</strong>
+        <p>Trong app, bấm vào mục <b>🔑 Cấu hình khóa API</b> (góc trên cùng bên trái)
+          → dán key vào ô → bấm <b>Lưu</b>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Góc trên phải hiện <span style="color:#4ade80">● API sẵn sàng</span></strong>
+        <p>Key được lưu trên máy bạn, không truyền đi đâu khác. Chỉ cần nhập 1 lần.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BƯỚC 4: Dùng thử / Lấy Machine ID ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="num">4</span>
+      Dùng thử & lấy Mã Máy để kích hoạt bản quyền
+    </div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>App tự tạo 30 ngày dùng thử</strong>
+        <p>Một banner vàng xuất hiện ở đầu trang: <i>"Đang dùng thử — còn X ngày."</i>
+          Bạn dùng đầy đủ tính năng trong suốt thời gian này.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Lấy Mã Máy để mua bản quyền</strong>
+        <p>Bấm nút <b>"Kích hoạt bản quyền"</b> trên banner vàng →
+          cửa sổ hiện <b>Mã Máy</b> của bạn:</p>
+        <div class="mid-demo">
+          <p>Mã máy của bạn</p>
+          <div class="mid-value">F646 – 8535</div>
+          <p>(ví dụ minh hoạ — mã thật sẽ khác)</p>
+        </div>
+        <p>Chụp màn hình hoặc ghi lại mã này, nhắn cho HungArch qua Zalo để nhận key.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Nhận License Key và kích hoạt</strong>
+        <p>Sau khi nhận key từ HungArch, dán vào ô <b>"Nhập license key"</b>
+          trong cùng cửa sổ → bấm <b>✅ Kích hoạt</b> → dùng không giới hạn thời gian.</p>
+      </div>
+    </div>
+    <div class="tip">
+      ✅ Key được ràng buộc với máy tính của bạn — không cần Internet để xác thực.
+      Nếu thay máy hoặc cài lại Windows, liên hệ HungArch để được cấp key mới miễn phí.
+    </div>
+  </div>
+
+  <!-- ── Xử lý sự cố ── -->
+  <div class="section">
+    <div class="section-title">
+      <span class="num">?</span>
+      Xử lý sự cố thường gặp
+    </div>
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <strong>Cửa sổ đen hiện rồi đóng ngay</strong>
+        <p>Python chưa được thêm vào PATH. Gỡ Python, cài lại, nhớ tích ô
+          <b>"Add Python to PATH"</b>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <strong>Trình duyệt hiện "localhost refused to connect"</strong>
+        <p>Server chưa khởi động xong — chờ thêm 30 giây rồi tải lại trang.
+          Hoặc kiểm tra cửa sổ đen có thông báo lỗi không.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <strong>Render báo lỗi "API key không hợp lệ" hoặc "429"</strong>
+        <p>Kiểm tra API key đã nhập đúng chưa. Nếu gặp lỗi 429: tài khoản Google Cloud
+          chưa bật Billing hoặc đã hết quota.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">!</div>
+      <div class="step-body">
+        <strong>Không thấy banner dùng thử / Mã Máy</strong>
+        <p>Tắt app (đóng cửa sổ đen), mở lại bằng <b>run.bat</b>,
+          tải lại trình duyệt (F5).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Liên hệ ── -->
+  <div class="contact">
+    <h3>Cần hỗ trợ?</h3>
+    <div class="zalo">Zalo: 0903 230 616</div>
+    <p>HungArch — hỗ trợ kỹ thuật &amp; cấp bản quyền</p>
+  </div>
+
+</div>
+</body>
+</html>
