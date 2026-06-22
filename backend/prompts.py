@@ -697,9 +697,11 @@ def build_exterior_prompt(
 # ---------------------------------------------------------------------------
 # TAB 3: BẢN VẼ 2D
 # Sub-mode 'drawing_mode':
-#   '3d_perspective'  → AI tạo phối cảnh 3D từ mặt bằng / phác thảo 2D
-#   '2d_render'       → AI làm đẹp bản vẽ 2D gốc, GIỮ NGUYÊN góc nhìn top-down/elevation
-#                        (mặt bằng/mặt đứng phối màu kiểu xuất LayOut SketchUp)
+#   '3d_perspective'  → AI tạo phối cảnh 3D góc người đứng (eye-level) từ mặt bằng/mặt đứng 2D
+#   '2d_render'       → AI tạo "Top-View 3D Floor Plan": dựng cảnh 3D đầy đủ (nội thất,
+#                        vật liệu, ánh sáng thật) rồi chụp bằng camera góc cao gần top-down
+#                        (KHÔNG phải orthographic phẳng kiểu xuất LayOut SketchUp — xem
+#                        _TOPVIEW_3D_CAMERA để biết lý do kỹ thuật).
 # 'drawing_type': 'autocad' | 'sketch'
 # 'drawing_output' khi drawing_mode='2d_render': 'floor_plan' | 'site_plan'
 #   (vẫn nhận 'interior'/'exterior' cũ làm alias để tương thích ngược với main.py)
@@ -713,20 +715,6 @@ _AUTOCAD_HINT_CLEAN = (
     "dimension lines and annotation text are for reference only (do not render them literally), "
     "standard architectural symbols apply (arc = door swing, double-line notch = window, "
     "hatched regions = walls/columns, rectangles = furniture)."
-)
-
-# 2D mode only: KEEP all existing linework including dimension lines — do NOT say "for reference only"
-# which causes Gemini to discard the geometry and regenerate a new plan from scratch.
-_AUTOCAD_HINT_CLEAN_2D = (
-    "The input is a clean AutoCAD vector drawing exported from CAD software. "
-    "FOR THIS COLORIZATION TASK: ALL existing linework must be preserved and remain fully visible "
-    "in the output — this includes wall lines (thick), furniture outlines (thin), "
-    "dimension lines with tick marks and numbers, grid bubble circles with letters/numbers, "
-    "section cut marks, hatch patterns inside walls/columns, door swing arcs, window openings, "
-    "stair tread lines, area labels, and all annotation text. "
-    "Do NOT remove, redraw, simplify, or reposition ANY of these lines. "
-    "Apply flat color fills BETWEEN existing boundary lines — "
-    "the existing linework stays fully visible ON TOP of color fills."
 )
 
 _AUTOCAD_HINT_SCAN = (
@@ -781,138 +769,107 @@ DRAWING_ELEVATION_TO_3D = (
 )
 
 # ---------------------------------------------------------------------------
-# KHÓA HÌNH HỌC CHO BẢN VẼ 2D — đặt ĐẦU TIÊN trong prompt để Gemini ưu tiên tuyệt đối
-# Gemini tuân thủ instruction đầu tiên cao nhất → geometry lock PHẢI là câu đầu tiên.
+# CAMERA "TOP-VIEW 3D FLOOR PLAN" — KHÔNG phải orthographic Parallel Projection phẳng.
+# Đây là kỹ thuật ngành gọi là "3D Floor Plan" / "Top-View 3D Rendering": một cảnh nội
+# thất 3D ĐẦY ĐỦ (đồ nội thất, vật liệu, ánh sáng thật) được chụp bằng camera Standard
+# có Field of View hẹp, đặt rất cao, ngắm gần như thẳng xuống nhưng KHÔNG đạt 90° tuyệt
+# đối — vẫn còn đủ góc để thấy mặt hông đồ vật và bóng đổ tự nhiên có chiều sâu.
+# Tham chiếu giáo trình V-Ray 7 (Camera Type: Standard, Field of View deg theo khổ ảnh)
+# và giáo trình SketchUp (Camera > Top, không bật Parallel Projection ở kỹ thuật này).
 # ---------------------------------------------------------------------------
-_2D_GEOMETRY_LOCK = (
-    "TASK TYPE: IMAGE COLORIZATION — THIS IS AN IMAGE EDITING TASK, NOT AN IMAGE GENERATION TASK. "
-    "You are NOT creating a new floor plan. You are COLORIZING an existing architectural drawing. "
-    "CRITICAL CONSTRAINT — TREAT THE INPUT AS AN IMMOVABLE LOCKED TEMPLATE: "
-    "Every single pixel of linework in the input — wall lines, room boundaries, door arcs, "
-    "window gaps, column outlines, stair symbols, furniture shapes, dimension lines, "
-    "grid bubble circles, annotation text — must appear in the output at the EXACT SAME PIXEL POSITION. "
-    "Nothing moves. Nothing is redrawn. Nothing is removed. Nothing is added or rearranged. "
-    "The ONLY permitted change: paint flat color fills INSIDE existing closed boundaries. "
-    "Think of it as a digital colouring-book: the line art is fixed, your only job is to colour inside the lines. "
-    "SCALE AND PROPORTION ARE LOCKED: if a room is 30% of the plan width in the input, "
-    "it must be exactly 30% of the plan width in the output. "
-    "If there are two or more separate plan sections with gaps between them, those gaps must remain exactly as in the input. "
-    "If the plan is in landscape orientation, the output must also be landscape. "
-    "Any output where the geometry, proportions, or layout differs from the input — even slightly — is a complete failure."
-)
-
-# ---------------------------------------------------------------------------
-# BÓNG ĐỔ KIỂU SKETCHUP LAYOUT (Parallel Projection) — KHÔNG phải bóng ảnh chụp
-# Tham chiếu quy trình chuẩn: Camera > Parallel Projection (giáo trình SketchUp 2025)
-# và Sun Light / Vertical-Horizontal Angle (giáo trình V-Ray 7).
-# ---------------------------------------------------------------------------
-_HARD_SHADOW_PLAN = (
-    "SHADOW STYLE — this is critical, follow exactly like a SketchUp LayOut export, "
-    "NOT a soft photographic render: "
-    "render shadows as if cast by a single distant directional sun light under an orthographic "
-    "PARALLEL PROJECTION camera (no perspective convergence, no camera depth-of-field blur). "
-    "Shadows must be HARD-EDGED silhouette shapes with crisp, clean, non-blurred outlines — "
-    "a flat, uniformly-toned grey/dark shadow shape (NOT a soft gradient falloff, NOT ambient "
-    "occlusion fuzziness), projected consistently in ONE single direction from every wall, "
-    "column, furniture piece, and tree symbol, as if the sun were fixed at one azimuth and "
-    "altitude across the entire plan. Shadow length should be modest and proportionate "
-    "(roughly 0.3–0.6× the casting object's plan footprint), pointing the same way for every "
-    "object — never radiating, never randomized, never softly diffused. "
-    "This hard, consistent, single-direction cast shadow is what gives the plan its crisp "
-    "architectural presentation look, exactly like a SketchUp/LayOut walls-and-roof shadow study."
-)
-
-# ---------------------------------------------------------------------------
-# PHÙ ĐIÊU 3D TOP-DOWN — nổi khối mà KHÔNG nghiêng trục, KHÔNG phối cảnh.
-# Camera vẫn 90° thẳng đứng (footprint không lệch → overlay_linework vẫn khớp).
-# Cảm giác 3D đến TỪ shading/AO/chất liệu, KHÔNG từ phép chiếu hình học.
-# ---------------------------------------------------------------------------
-_RELIEF_3D_PLAN = (
-    "RELIEF / VOLUMETRIC DEPTH — make the plan read as a richly three-dimensional "
-    "'rendered floor plan' that visually pops, WITHOUT changing the camera: "
-    "the camera stays STRICTLY 90° orthographic straight-down top view — "
-    "NO perspective convergence, NO axonometric/isometric tilt, NO visible vertical side faces. "
-    "The sense of depth must come ONLY from shading and lighting cues, never from geometric projection: "
-    "(1) add soft AMBIENT OCCLUSION — a subtle dark contact-shading gradient where walls meet the floor, "
-    "inside corners, and around the base of every furniture piece, so objects feel seated and raised; "
-    "(2) render furniture, beds, sofas, rugs and fixtures with realistic TOP-SURFACE material shading — "
-    "cushions look plump, tabletops have a soft sheen, bedding has gentle folds and self-shadow — "
-    "so each object reads as a solid object with real thickness seen from directly above; "
-    "(3) give walls a subtle raised-edge highlight and a thin self-shadow along one side so the poché "
-    "reads as a wall standing up off the floor plane; "
-    "(4) add gentle material highlights and faint reflections on glossy floors / water / glass. "
-    "CRITICAL: every object's outline must stay exactly on its plan footprint — depth is faked with "
-    "tone and shadow only, the footprint geometry never moves or enlarges."
+_TOPVIEW_3D_CAMERA = (
+    "CAMERA SETUP — this is critical, this is a 'Top-View 3D Floor Plan' render, "
+    "NOT a flat orthographic CAD plan and NOT a true 90° architectural drawing: "
+    "place a standard perspective camera almost directly above the floor plan, looking "
+    "down at roughly 75–85° from the horizontal (i.e. just shy of straight-down), with a "
+    "narrow-to-moderate field of view (roughly 30–45°), positioned high enough to frame "
+    "the entire plan. This small amount of residual perspective is intentional and "
+    "essential — it must still read as a real 3D photograph taken from above, not a "
+    "flattened 2D diagram. The viewer should clearly see the sides/fronts of furniture "
+    "(headboards, sofa backs, armrests, cabinet faces) exactly the way a real photo from "
+    "a high vantage point would reveal them — never perfectly flat top silhouettes."
 )
 
 DRAWING_TO_2D_FLOOR_PLAN = (
-    "COLORIZATION TARGET: A 2D architectural floor plan (mặt bằng) in strict orthographic "
-    "top-down view — do NOT tilt, do NOT add perspective, do NOT convert to isometric or 3D. "
-    "GOAL: Apply professional flat color fills to each room/space in this floor plan to produce "
-    "a presentation-quality colored floor plan ('mặt bằng phối màu'). "
-    "COLOR GUIDE — apply these flat, even tint fills INSIDE existing room boundaries: "
-    "office/working/living areas → warm honey-tan (wood floor tone); "
-    "meeting rooms → slightly cooler warm beige; "
-    "wet areas (WC, bathroom, pantry, kitchen) → pale blue-grey tile tone; "
-    "reception/lobby/corridor/circulation → light neutral warm grey; "
-    "storage/service/utility rooms → cool light grey; "
-    "outdoor terraces/balconies → light terracotta or stone grey paving tone. "
-    "Wall/poché areas: add a dark grey fill inside thick wall regions if clearly identifiable — "
-    "do NOT redraw or move any wall line. "
-    "Furniture symbols: leave their shape and position exactly as in the input; "
-    "optionally add a very subtle flat fill tint to distinguish them from the floor. "
-    "KEEP visible in the output: all dimension lines, grid bubble circles, section cut marks, "
-    "hatch patterns, and annotation text exactly as they appear in the input. "
-    "OUTPUT: The exact same drawing as the input, with flat color fills added inside rooms. "
-    "Same layout. Same proportions. Same orientation. Geometry 100% identical to input."
+    "This is a 2D architectural FLOOR PLAN (mặt bằng) line drawing. "
+    "TASK: Transform this flat 2D floor plan into a fully furnished, photorealistic "
+    "'Top-View 3D Floor Plan' render — the premium presentation style used by real estate "
+    "and interior design studios, where the entire unit is modelled and furnished in 3D "
+    "and then photographed from a high top-down camera (see CAMERA SETUP). "
+    "READ the floor plan: solid lines = walls; arcs = door swings; gaps in walls = windows; "
+    "rectangles/icons = furniture and fixtures — preserve every room boundary, every wall "
+    "position, every door/window opening exactly where drawn, and the overall proportions "
+    "and scale of the unit. "
+    "BUILD a complete, fully realised 3D interior scene from this layout: "
+    "walls are real 3D walls, trimmed down to a low parapet height (roughly 300–500mm tall) "
+    "so the camera can see directly into every room from above — walls read as a clean dark "
+    "edge/poché line at this height, not full-height walls blocking the view; "
+    "floors are real photorealistic materials matching what each room implies (warm timber "
+    "parquet with visible wood grain and plank joints in bedrooms/living areas, "
+    "porcelain/ceramic tile with visible grout lines in bathrooms and kitchens, soft-pile "
+    "carpet texture where appropriate); "
+    "every room is FULLY FURNISHED with realistic, well-proportioned 3D furniture appropriate "
+    "to its function (bed with pillows/duvet in bedrooms, sofa/coffee table/TV console in the "
+    "living room, dining table with chairs, kitchen counters/cabinets, wardrobe, bathroom "
+    "fixtures) — furniture should have real volume, fabric texture, and soft shadow contact "
+    "with the floor, matching the polish of professional real-estate 3D floor plan renders; "
+    "doors are rendered as real 3D door leaves shown open at their drawn swing angle; "
+    "windows show a thin realistic frame and a soft hint of daylight/glass reflection. "
+    "LIGHTING: soft, even, naturally diffused interior daylight from the windows plus gentle "
+    "ambient fill — the kind of soft multi-directional light a real photo from above would "
+    "show, casting soft, naturally-blurred contact shadows under every piece of furniture "
+    "and along every wall base. Shadows must look physically real (soft penumbra, natural "
+    "falloff) — NOT a hard flat silhouette, NOT a single rigid cast-shadow direction. "
+    "Output: a warm, photorealistic, fully-furnished top-view 3D floor plan, "
+    "at the exact same layout, proportions and room arrangement as the input plan."
 )
 
 DRAWING_TO_2D_SITE_PLAN = (
-    "COLORIZATION TARGET: A 2D architectural site plan or landscape plan "
-    "(mặt bằng tổng thể / quy hoạch / cảnh quan) in strict orthographic top-down view — "
-    "do NOT tilt, do NOT add perspective, do NOT convert to isometric or 3D. "
-    "GOAL: Apply professional flat color fills to each zone in this site plan. "
-    "COLOR GUIDE — apply flat tint fills INSIDE existing zone boundaries: "
-    "building footprints → light warm grey or terracotta roof-plan tone; "
-    "tree/shrub circle symbols → layered green (medium to dark green per canopy size); "
-    "lawn/grass zones → flat mid-green; "
-    "roads, driveways, footpaths → flat light grey; "
-    "water features (pools, ponds, fountains) → flat turquoise-blue; "
-    "parking areas → flat pale grey with existing parking bay lines kept visible; "
-    "open plazas/terraces → flat warm stone-grey paving tone. "
-    "KEEP visible in the output: all boundary lines, setback lines, dimension lines, "
-    "contour lines, grid markers, and annotation text exactly as they appear in the input. "
-    "Do NOT redraw, simplify, or remove any existing line. "
-    "OUTPUT: The exact same drawing as the input, with flat color fills added. "
-    "Same layout. Same proportions. Same orientation. Geometry 100% identical to input."
+    "This is a 2D architectural SITE PLAN or LANDSCAPE LAYOUT (mặt bằng tổng thể / quy hoạch / "
+    "cảnh quan) line drawing. "
+    "TASK: Transform this flat 2D site plan into a fully realised, photorealistic top-view "
+    "3D site/landscape render — built as a complete 3D scene (buildings, paving, planting, "
+    "water features) and photographed from a high top-down camera (see CAMERA SETUP). "
+    "READ the site plan: building outlines, boundary lines, road/path centrelines and widths, "
+    "tree/shrub symbols, water bodies and parking layout — preserve every footprint, boundary, "
+    "and plotted element exactly where drawn, at the same scale and proportion. "
+    "BUILD a complete 3D landscape scene from this layout: "
+    "building footprints become real roof volumes with a realistic roof material (tile, "
+    "membrane, or flat roof finish as architecturally appropriate) and a small amount of "
+    "real building height/massing visible at this camera angle, not a flat colour patch; "
+    "tree and shrub symbols become real 3D canopy forms viewed from above — full, layered, "
+    "photorealistic foliage with natural colour variation by species/size, casting soft "
+    "natural shadow onto the ground beneath; "
+    "lawn and planting beds become real grass/groundcover texture; "
+    "roads, driveways and footpaths become realistic paved surfaces with visible material "
+    "texture (asphalt, paver joints, or concrete as appropriate) and soft ambient shading; "
+    "water bodies (pools, ponds, fountains) become real water material with natural "
+    "reflections, subtle ripples and depth, not a flat colour fill; "
+    "parking areas show real paving with visible bay markings. "
+    "LIGHTING: soft, natural daylight from one consistent high sun angle, casting soft, "
+    "naturally-blurred shadows from buildings and trees with realistic falloff and length — "
+    "physically believable outdoor daylight shadows, not flat graphic silhouettes. "
+    "Output: a warm, photorealistic, fully-realised top-view 3D site/landscape render, "
+    "at the exact same layout, proportions and arrangement as the input plan."
 )
 
 # ---------------------------------------------------------------------------
-# CHẤT LƯỢNG ĐẦU RA RIÊNG CHO BẢN VẼ 2D — KHÔNG dùng QUALITY_SUFFIX (3D photography)
-# QUALITY_SUFFIX nói về DOF, lens flare, camera photography → sai hoàn toàn cho ảnh
-# orthographic top-down. Bản vẽ 2D cần: phẳng, sắc nét, không méo, không có ống kính.
+# CHẤT LƯỢNG ĐẦU RA RIÊNG CHO "TOP-VIEW 3D FLOOR PLAN" — đây LÀ ảnh nhiếp ảnh/render
+# 3D thật, khác hẳn QUALITY_SUFFIX gốc (vốn nói về ảnh phối cảnh góc thấp/eye-level).
+# Không dùng ngôn ngữ "flat/vector-like/orthographic" — ngược lại, nhấn mạnh chiều sâu,
+# vật liệu thật, ánh sáng mềm tự nhiên — đúng tinh thần render final trong giáo trình V-Ray.
 # ---------------------------------------------------------------------------
-# Tô PHẲNG, nhạt, KHÔNG bóng — để overlay_linework() dán nét gốc lại mà không bị
-# nội dung tối (tường đen/bóng đổ do Gemini vẽ) gây nhân đôi (doubling/ghosting).
-_FLAT_COLOR_2D = (
-    "COLOUR STYLE — FLAT, LIGHT and SHADOWLESS (this is critical): "
-    "fill each room with ONE flat, even, PALE colour wash — like a single paint-bucket fill, "
-    "low saturation and high brightness, no gradient across the room. "
-    "Do NOT add ANY shadow of any kind: no drop shadow, no cast shadow, no ambient occlusion, "
-    "no contact shading, no 3D relief, no volume, no glossy highlight. The plan stays perfectly flat. "
-    "Do NOT paint thick black walls or heavy dark poché, and do NOT redraw or thicken any line — "
-    "keep all linework as thin and light as in the input (the precise lines are restored afterwards). "
-    "Minimise dark pixels everywhere: only pale colour on a white background, nothing dark, nothing shaded."
-)
-
 QUALITY_SUFFIX_2D = (
-    "Output is a FLAT orthographic top-down coloured floor plan — camera strictly 90° straight down, "
-    "NOT a tilted 3D photograph: zero perspective, zero axonometric tilt, zero visible vertical faces, "
-    "zero lens flare, zero sky, zero horizon, and zero shadows or relief. "
-    "Even, flat, pale colour fills only — no shading gradients, no dark areas. "
-    "Keep linework thin and light exactly as in the input; do NOT redraw, thicken, or move any line. "
-    "Professional architectural presentation quality. "
-    "Do NOT add new text, new dimension numbers, watermarks, borders, or people."
+    "Output must read as a genuine high-end CGI photograph taken from above — full "
+    "photorealistic materials, soft natural global illumination, gentle ambient occlusion "
+    "in corners and under furniture, subtle realistic reflections on glossy surfaces. "
+    "A light, natural depth-of-field falloff toward the frame edges is acceptable and "
+    "expected, the way a real high-vantage-point photo would render. "
+    "Professional real-estate / interior-design 'Top-View 3D Floor Plan' presentation "
+    "quality — warm, inviting, magazine-ready. "
+    "No text labels added, no dimension numbers added, no watermark, no border, no people, "
+    "no flat 2D schematic elements of any kind — every element must look like a real "
+    "physical object photographed in 3D space."
 )
 
 
@@ -931,9 +888,10 @@ def build_drawing_prompt(
 
     drawing_mode='3d_perspective' + drawing_output='interior' → phối cảnh nội thất 3D từ mặt bằng.
     drawing_mode='3d_perspective' + drawing_output='exterior' → phối cảnh ngoại thất 3D từ mặt đứng.
-    drawing_mode='2d_render' → làm đẹp bản vẽ 2D gốc, GIỮ NGUYÊN góc nhìn top-down:
-        drawing_output='floor_plan' (alias cũ: 'interior') → mặt bằng nội thất/tầng, phối màu vật liệu sàn.
-        drawing_output='site_plan'  (alias cũ: 'exterior') → mặt bằng tổng thể/cảnh quan, phối màu cây xanh/đường/hồ nước.
+    drawing_mode='2d_render' → dựng "Top-View 3D Floor Plan": cảnh 3D đầy đủ nội thất/vật liệu/
+        ánh sáng thật, chụp bằng camera góc cao gần top-down (xem _TOPVIEW_3D_CAMERA):
+        drawing_output='floor_plan' (alias cũ: 'interior') → mặt bằng nội thất/tầng, nội thất hóa đầy đủ.
+        drawing_output='site_plan'  (alias cũ: 'exterior') → mặt bằng tổng thể/cảnh quan 3D hóa.
     drawing_type='autocad'|'sketch' → gợi ý thêm cho AI về chất lượng đường nét.
     is_scan=True → ảnh AutoCAD là ảnh chụp/scan chất lượng thấp (mờ, nghiêng, nhiễu, watermark),
         khác với file CAD vector xuất sạch. Chỉ có ý nghĩa khi drawing_type='autocad'.
@@ -959,19 +917,7 @@ def build_drawing_prompt(
         # trực tiếp 'floor_plan'/'site_plan'.
         is_site_plan = drawing_output in ("exterior", "site_plan")
         base = DRAWING_TO_2D_SITE_PLAN if is_site_plan else DRAWING_TO_2D_FLOOR_PLAN
-        # 2D mode dùng hint KHÁC: _AUTOCAD_HINT_CLEAN_2D GIỮ dimension lines,
-        # thay vì _AUTOCAD_HINT_CLEAN nói "for reference only" → Gemini xoá hết và vẽ lại.
-        if drawing_type == "autocad":
-            dtype_hint_2d = _AUTOCAD_HINT_SCAN if is_scan else _AUTOCAD_HINT_CLEAN_2D
-        else:
-            dtype_hint_2d = _SKETCH_HINT
-        # _2D_GEOMETRY_LOCK đứng ĐẦU TIÊN — Gemini ưu tiên instruction đầu cao nhất.
-        # _FLAT_COLOR_2D: ép tô PHẲNG, KHÔNG bóng/relief → tránh nội dung tối gây doubling
-        # khi overlay_linework() dán nét gốc lại. (Shadow/relief đã bỏ — xem image_utils.py.)
-        return _join([
-            _2D_GEOMETRY_LOCK, base, dtype_hint_2d,
-            _FLAT_COLOR_2D, user, QUALITY_SUFFIX_2D,
-        ])
+        return _join([base, dtype_hint, _TOPVIEW_3D_CAMERA, user, QUALITY_SUFFIX_2D])
 
 
 def build_text_edit_prompt(instruction: str) -> str:
@@ -1022,18 +968,9 @@ def build_inpaint_prompt(instruction: str) -> str:
 
 
 REFERENCE_INSTRUCTION = (
-    "STYLE-REFERENCE RULES — strict separation of concerns between the two images:\n"
-    "FROM IMAGE 1 (the PRIMARY SketchUp input) take EVERYTHING structural and spatial: "
-    "the exact camera angle and viewpoint, the room geometry, every wall / window / door position, "
-    "the spatial layout, and which furniture and objects exist and exactly where they sit. "
-    "Your render's composition must match IMAGE 1 — NOT the reference.\n"
-    "FROM IMAGE 2 (the style reference) take ONLY the look-and-feel: colour grading, "
-    "material tones and finish quality, and lighting mood — so both renders feel like the same project.\n"
-    "ABSOLUTE PROHIBITION — DO NOT copy any of the following FROM the reference image: "
-    "its camera angle, its room shape or geometry, its furniture layout, any specific object or model, "
-    "any screen / TV / monitor content, any signage, logo, text or people, or its overall composition. "
-    "If the reference shows a different room, a different angle, or different furniture, IGNORE its "
-    "structure completely — treat it purely as a colour-and-material swatch, never as a scene to reproduce."
+    "An additional reference image is provided. Match its overall colour grading, "
+    "material palette, mood and lighting style so this render stays visually consistent "
+    "with it, while still respecting the geometry of the main SketchUp input."
 )
 
 

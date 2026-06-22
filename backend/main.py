@@ -21,7 +21,6 @@ from pydantic import BaseModel
 
 import config
 import gemini_client
-import image_utils
 import license as lic
 import pdf_utils
 import prompts
@@ -140,16 +139,8 @@ async def api_render_pdf_page(
     except gemini_client.GeminiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
-    # 2D render: overlay original CAD linework to restore exact geometry.
-    # Gemini's generative pipeline loses pixel positions at encoding — this
-    # composites the original walls/dimensions/text back on top of AI color fills.
-    if drawing_mode == "2d_render":
-        result_path = config.OUTPUTS_DIR / result.image_filename
-        composited = image_utils.overlay_linework(
-            colorized_bytes=result_path.read_bytes(),
-            original_bytes=image_bytes,
-        )
-        result_path.write_bytes(composited)
+    # 2D render = "Top-View 3D Floor Plan": Gemini dựng cảnh 3D đầy đủ rồi chụp góc cao.
+    # KHÔNG overlay nét CAD lên ảnh — sẽ phá hỏng ảnh render 3D (xem prompts.py).
 
     return JSONResponse({
         "seed":           result.seed,
@@ -252,16 +243,8 @@ async def api_render(
     except gemini_client.GeminiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
-    # 2D drawing mode: overlay original CAD linework to restore exact geometry.
-    # Gemini's generative pipeline loses pixel positions at encoding — this
-    # composites the original walls/dimensions/text back on top of AI color fills.
-    if mode == "drawing" and drawing_mode == "2d_render":
-        result_path = config.OUTPUTS_DIR / result.image_filename
-        composited = image_utils.overlay_linework(
-            colorized_bytes=result_path.read_bytes(),
-            original_bytes=image_bytes,
-        )
-        result_path.write_bytes(composited)
+    # 2D render = "Top-View 3D Floor Plan": dùng trực tiếp ảnh render 3D của Gemini,
+    # KHÔNG overlay nét CAD (sẽ phá hỏng ảnh 3D). Xem prompts.py.
 
     return JSONResponse({
         "seed":           result.seed,

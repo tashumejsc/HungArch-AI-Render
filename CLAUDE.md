@@ -24,7 +24,6 @@ Manual start (after first run):
 ### Request Flow
 ```
 Browser (frontend/) → FastAPI (backend/main.py) → gemini_client.py → store.py → outputs/
-                                              ↳ image_utils.py (2D linework overlay)
                                               ↳ pdf_utils.py    (PDF page split)
                                               ↳ license.py      (trial / activation gate)
 ```
@@ -33,12 +32,12 @@ Browser (frontend/) → FastAPI (backend/main.py) → gemini_client.py → store
 
 | File | Role |
 |---|---|
-| `main.py` | FastAPI app; **10 routes**: `GET /api/presets`, `POST /api/config`, `GET /api/license`, `POST /api/license/activate`, `POST /api/pdf-preview`, `POST /api/render-pdf-page`, `POST /api/render`, `POST /api/inpaint`, `POST /api/analyze-mood`, `POST /api/enhance`. Image-generating routes call `_require_license()` first. After any 2D-render (`drawing_mode == "2d_render"`), `main.py` calls `image_utils.overlay_linework()` to re-stamp the original CAD lines on the Gemini output. |
+| `main.py` | FastAPI app; **10 routes**: `GET /api/presets`, `POST /api/config`, `GET /api/license`, `POST /api/license/activate`, `POST /api/pdf-preview`, `POST /api/render-pdf-page`, `POST /api/render`, `POST /api/inpaint`, `POST /api/analyze-mood`, `POST /api/enhance`. Image-generating routes call `_require_license()` first. 2D-render (`drawing_mode == "2d_render"`) returns Gemini's raw "Top-View 3D Floor Plan" output with **no** post-processing (the old `overlay_linework` step was removed). |
 | `config.py` | Loads `.env`, exposes API keys and model IDs. `set_keys()` updates runtime state AND rewrites `.env` (called from `/api/config`). Client rebuilds lazily when key changes. Models: `flash` = `gemini-3.1-flash-image`, `pro` = `gemini-3-pro-image`. **Do not add `gemini-2.5-*-preview` — those are chat models and return 404 for IMAGE modality.** |
 | `prompts.py` | **Single source of truth for all presets and prompt logic.** Key functions: `build_interior_prompt()`, `build_exterior_prompt()`, `build_drawing_prompt()` (dispatches to interior/exterior 3D or 2D render path), `build_inpaint_prompt()` (mask-based), `build_text_edit_prompt()` (text-only, no mask), `build_mood_analysis_prompt()` (colour-grading suggestion). `presets_payload()` drives all frontend dropdowns incl. `mood_presets`. `REFERENCE_INSTRUCTION` enforces strict separation between the two render images (see Reference-image style sync below). |
 | `store.py` | Saves `outputs/<token>.png` + `outputs/<token>.json` (metadata). `seed = token = filename` — no separate display_seed. |
 | `gemini_client.py` | Wraps `google-genai` SDK. Four operations: `render()` (SketchUp → photorealistic, optional reference image), `enhance()` (quality upscale), `inpaint()` (local edit — mask OR text-only), `analyze_mood()` (text-only JSON response — no image modality). `_build_config()` constructs `GenerateContentConfig` defensively (tries full → partial → empty to survive SDK changes). **`render()` with a reference image interleaves a labelling text part BEFORE each image** (`"IMAGE 1 … PRIMARY INPUT"` / `"IMAGE 2 … STYLE REFERENCE ONLY"`) so Gemini does not copy the reference's geometry. |
-| `image_utils.py` | `overlay_linework(colorized_bytes, original_bytes)` — composites original CAD dark linework (avg RGB < 170) back onto the Gemini-colorized 2D plan at exact pixel positions. Core of the 2D geometry-preservation fix; depends on `numpy` + `pillow`. |
+| `image_utils.py` | **Dead code** — `overlay_linework()` from the abandoned 2D-colourise approach. No longer imported by `main.py`. Kept on disk for reference; safe to delete. |
 | `pdf_utils.py` | Splits an uploaded PDF into per-page PNGs + thumbnails for the multi-page 2D render flow. |
 | `license.py` | 30-day trial + offline ECDSA key activation. `get_status()` / `activate()`. |
 
@@ -128,16 +127,16 @@ This prevents cumulative geometry drift from repeated inpaints on already-inpain
 
 `POST /api/analyze-mood` accepts `image` + `mood` (key from `MOOD_PRESETS`) + `model`. It calls `gemini_client.analyze_mood()` which uses **text-only Gemini** (no image output, cheaper than render) and returns JSON `{brightness, contrast, saturate, warmth}`. Frontend `doAnalyzeMood()` applies these to the 4 colour sliders via `updateAdj()`. `MOOD_PRESETS` in `prompts.py` has 5 entries: `warm_luxe`, `cool_minimal`, `natural_daylight`, `cinematic_moody`, `warm_residential`.
 
-### 2D drawing — geometry preservation (linework overlay)
+### 2D drawing — "Top-View 3D Floor Plan" (current approach)
 
-**The hard constraint:** Gemini image generation encodes the input into a semantic latent → it **loses exact pixel positions** and re-generates a *new* plan that drifts in layout/proportions. No prompt can fully fix this. The reliable fix is a post-step, not a better prompt.
+**Design pivot (important history):** the 2D path originally tried to *colourise* the CAD line drawing while preserving exact geometry, using `image_utils.overlay_linework()` as a post-step. Every variant (stamp / erase / multiply / saturation-gated multiply / region-fill) hit the same wall — colours read flat/pale/bleeding and there was no real 3D depth, because it was fundamentally a 2D tint over line art. **That whole approach was abandoned.**
 
-The 2D render path therefore combines:
-1. **Prompt framing as colorization, not generation** — `prompts.py` 2D constants (`_2D_GEOMETRY_LOCK`, `DRAWING_TO_2D_FLOOR_PLAN`, `DRAWING_TO_2D_SITE_PLAN`, `QUALITY_SUFFIX_2D`) describe "colour inside existing lines", keep dimension lines (`_AUTOCAD_HINT_CLEAN_2D`, **not** the 3D `_AUTOCAD_HINT_CLEAN` which says dims are "for reference only" → Gemini deletes them).
-2. **`_FLAT_COLOR_2D`** — forces Gemini to paint FLAT, LIGHT, **shadowless** pale fills and NOT draw thick black walls/poché. This is deliberate: any dark content Gemini generates is *misaligned* with the original and causes doubling/ghosting after overlay. **Do NOT add shadow/relief here** (the old `_HARD_SHADOW_PLAN` / `_RELIEF_3D_PLAN` are no longer used in the 2D path for exactly this reason — they fought the overlay). 2D = clean flat colour; "3D pop" is sacrificed for geometry accuracy.
-3. **`image_utils.overlay_linework()`** in `main.py` — **saturation-gated MULTIPLY**, the definitive design: `result = original_drawing × (wash / 255)`. Structure comes 100% from the original (black line × anything = black; white room × colour = tinted), so Gemini's drifted geometry **cannot appear** — doubling impossible by construction. The wash keeps Gemini's colour only where it is **saturated** (real room colour, brightened + saturation-boosted for solid LayOut-style fills) and pushes **desaturated** pixels (Gemini's grey walls / shadows / redrawn lines) to **white**, so ghosts tint nothing and vanish. No segmentation → no door-merge muddiness (an earlier region-fill attempt merged rooms through doorways). Evolution to know about: stamp/erase → faint grey ghost; plain multiply → no ghost but washed-out pale; region-fill → muddy door merges; **saturation-gated multiply → solid colour + no ghost** (current). Caveat: a shadow Gemini paints inside a room becomes a small white patch — the flat/shadowless 2D prompt keeps these rare. Applied in both `/api/render` (drawing 2D) and `/api/render-pdf-page`.
+The current 2D mode is a **generative "Top-View 3D Floor Plan"**: Gemini builds a complete, fully-furnished 3D scene from the 2D plan (real materials, real furniture, walls trimmed to a low parapet so the camera sees in) and photographs it from a **high camera at ~75–85°** (not a flat 90° orthographic) so furniture sides and **real soft 3D shadows** are visible — the real-estate "3D floor plan" presentation style.
 
-2D prompt order in `build_drawing_prompt()`: `[_2D_GEOMETRY_LOCK, base, dtype_hint_2d, _FLAT_COLOR_2D, user, QUALITY_SUFFIX_2D]` — geometry lock FIRST (Gemini prioritises the first instruction).
+- Driven entirely by `prompts.py`: `DRAWING_TO_2D_FLOOR_PLAN` / `DRAWING_TO_2D_SITE_PLAN` (build a furnished 3D scene), `_TOPVIEW_3D_CAMERA` (the ~75–85° high camera, residual perspective is *intentional*), `QUALITY_SUFFIX_2D` (genuine CGI photo, NOT flat/orthographic/vector). Order: `[base, dtype_hint, _TOPVIEW_3D_CAMERA, user, QUALITY_SUFFIX_2D]`.
+- **No post-processing.** `main.py` does NOT call `overlay_linework()` for 2D anymore — the raw Gemini 3D render is the output. Stamping CAD lines on top would destroy the 3D look.
+- **`image_utils.py` is now dead code** (kept on disk, no longer imported). `numpy`/`scipy` are no longer needed by the 2D path.
+- **Trade-off accepted:** geometry is no longer pixel-exact (it's a generative 3D scene that follows the plan's layout/proportions), in exchange for a genuinely 3D, furnished, shadowed presentation render.
 
 ### Reference-image style sync (Đồng bộ Style)
 
@@ -200,6 +199,6 @@ Same pattern for `EXTERIOR_CONTEXTS`, `EXTERIOR_WEATHER`, `LIGHTING_PRESETS`, `V
 
 - **Gemini image models have free tier = 0.** All Gemini image generation requires billing enabled on the Google Cloud project. `analyze_mood` uses text-only mode and is cheaper (~¼–½ of a render call).
 - **`gemini-2.5-*-preview` models do NOT support IMAGE response modality** — they return 404. Only use models explicitly listed in `config.py`. `analyze_mood()` uses text-only so it can use any model, but for consistency uses the same model keys.
-- Python 3.14 compatibility: `requirements.txt` uses `>=` (not pinned `==`) intentionally. `numpy` is required (used by `image_utils.overlay_linework`).
+- Python 3.14 compatibility: `requirements.txt` uses `>=` (not pinned `==`) intentionally. (`numpy` is listed but now only used by the dead `image_utils.py`.)
 - Replicate is fully removed. `replicate_client.py` deleted; no Replicate constants in `prompts.py` or `requirements.txt`.
-- **2D geometry cannot be preserved by prompting alone** — Gemini regenerates the plan. The `image_utils.overlay_linework()` post-step is mandatory; do not remove it expecting prompt tweaks to compensate.
+- **2D mode is now a generative "Top-View 3D Floor Plan"**, not a geometry-exact colourise. Gemini regenerates the plan as a furnished 3D scene; exact pixel geometry is intentionally NOT preserved. Do not re-add CAD-line overlay post-processing — it was removed on purpose (it killed the 3D look).

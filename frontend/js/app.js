@@ -162,7 +162,7 @@
   const DRAWING_MODE_HINTS = {
     '3d_perspective_interior': 'AI đọc mặt bằng và tưởng tượng phối cảnh nội thất 3D thực tế.',
     '3d_perspective_exterior': 'AI đọc mặt đứng và tạo phối cảnh ngoại thất 3D với bối cảnh thực tế.',
-    '2d_render':               'AI giữ nguyên góc nhìn top-down, làm đẹp đường nét + tô màu vật liệu + bóng đổ kiểu LayOut SketchUp.',
+    '2d_render':               'AI dựng cảnh 3D đầy đủ nội thất, vật liệu & ánh sáng thật từ mặt bằng, chụp góc cao gần top-down (Top-View 3D Floor Plan) — có chiều sâu và bóng đổ 3D thật.',
   };
 
   function _updateDrawingHint() {
@@ -184,8 +184,8 @@
   }
 
   const _OUTPUT_HINTS_2D = {
-    interior: 'Tô màu vật liệu sàn theo từng phòng, đồ nội thất dạng khối phẳng — đúng kiểu mặt bằng layout.',
-    exterior: 'Tô màu cây xanh, đường nội bộ, hồ nước, bãi đỗ xe — đúng kiểu mặt bằng tổng thể/cảnh quan.',
+    interior: 'Dựng 3D từng phòng đầy đủ nội thất (giường, sofa, bàn ăn…), sàn vật liệu thật, tường hạ thấp nhìn xuyên xuống — Top-View 3D Floor Plan.',
+    exterior: 'Dựng 3D tổng thể: mái công trình, cây xanh khối 3D, đường, hồ nước phản chiếu — phối cảnh cảnh quan nhìn từ trên cao.',
   };
 
   function _updateDrawingOutputHint() {
