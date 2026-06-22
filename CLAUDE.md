@@ -134,10 +134,10 @@ This prevents cumulative geometry drift from repeated inpaints on already-inpain
 
 The 2D render path therefore combines:
 1. **Prompt framing as colorization, not generation** — `prompts.py` 2D constants (`_2D_GEOMETRY_LOCK`, `DRAWING_TO_2D_FLOOR_PLAN`, `DRAWING_TO_2D_SITE_PLAN`, `QUALITY_SUFFIX_2D`) describe "colour inside existing lines", keep dimension lines (`_AUTOCAD_HINT_CLEAN_2D`, **not** the 3D `_AUTOCAD_HINT_CLEAN` which says dims are "for reference only" → Gemini deletes them).
-2. **`_RELIEF_3D_PLAN`** — gives the flat plan a raised "3D top-down" pop via ambient occlusion / self-shadow / material highlights **while the camera stays strictly 90° orthographic** (no tilt, no perspective) so footprints don't shift.
-3. **`image_utils.overlay_linework()`** in `main.py` — after Gemini returns, re-stamps the original CAD dark pixels onto the result. Net effect: **colour/relief from Gemini, line geometry 100% from the original file.** Applied in both `/api/render` (drawing 2D) and `/api/render-pdf-page`.
+2. **`_FLAT_COLOR_2D`** — forces Gemini to paint FLAT, LIGHT, **shadowless** pale fills and NOT draw thick black walls/poché. This is deliberate: any dark content Gemini generates is *misaligned* with the original and causes doubling/ghosting after overlay. **Do NOT add shadow/relief here** (the old `_HARD_SHADOW_PLAN` / `_RELIEF_3D_PLAN` are no longer used in the 2D path for exactly this reason — they fought the overlay). 2D = clean flat colour; "3D pop" is sacrificed for geometry accuracy.
+3. **`image_utils.overlay_linework()`** in `main.py` — treats Gemini purely as a **colour** source, never structure: (a) median pass removes Gemini's thin redrawn lines; (b) an HSV **brightness-floor lift** (`value_floor`) brightens every dark pixel *of any size* (thick walls, big shadow blobs) to pale grey while keeping room hue — local filters can't remove large blobs, a per-pixel value floor can; (c) stamps the original CAD lines (kept at original resolution, never stretched) on top → **one single crisp line set, no doubling**. Applied in both `/api/render` (drawing 2D) and `/api/render-pdf-page`.
 
-2D prompt order in `build_drawing_prompt()`: `[_2D_GEOMETRY_LOCK, base, dtype_hint_2d, _HARD_SHADOW_PLAN, _RELIEF_3D_PLAN, user, QUALITY_SUFFIX_2D]` — geometry lock FIRST (Gemini prioritises the first instruction).
+2D prompt order in `build_drawing_prompt()`: `[_2D_GEOMETRY_LOCK, base, dtype_hint_2d, _FLAT_COLOR_2D, user, QUALITY_SUFFIX_2D]` — geometry lock FIRST (Gemini prioritises the first instruction).
 
 ### Reference-image style sync (Đồng bộ Style)
 

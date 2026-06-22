@@ -892,16 +892,25 @@ DRAWING_TO_2D_SITE_PLAN = (
 # QUALITY_SUFFIX nói về DOF, lens flare, camera photography → sai hoàn toàn cho ảnh
 # orthographic top-down. Bản vẽ 2D cần: phẳng, sắc nét, không méo, không có ống kính.
 # ---------------------------------------------------------------------------
+# Tô PHẲNG, nhạt, KHÔNG bóng — để overlay_linework() dán nét gốc lại mà không bị
+# nội dung tối (tường đen/bóng đổ do Gemini vẽ) gây nhân đôi (doubling/ghosting).
+_FLAT_COLOR_2D = (
+    "COLOUR STYLE — FLAT, LIGHT and SHADOWLESS (this is critical): "
+    "fill each room with ONE flat, even, PALE colour wash — like a single paint-bucket fill, "
+    "low saturation and high brightness, no gradient across the room. "
+    "Do NOT add ANY shadow of any kind: no drop shadow, no cast shadow, no ambient occlusion, "
+    "no contact shading, no 3D relief, no volume, no glossy highlight. The plan stays perfectly flat. "
+    "Do NOT paint thick black walls or heavy dark poché, and do NOT redraw or thicken any line — "
+    "keep all linework as thin and light as in the input (the precise lines are restored afterwards). "
+    "Minimise dark pixels everywhere: only pale colour on a white background, nothing dark, nothing shaded."
+)
+
 QUALITY_SUFFIX_2D = (
-    "Output is an ORTHOGRAPHIC top-down rendered floor plan — camera strictly 90° straight down, "
-    "NOT a tilted 3D photograph: zero perspective convergence, zero axonometric tilt, "
-    "zero visible vertical side faces, zero lens flare, zero sky or horizon. "
-    "PRESERVE THE ORIGINAL LINEWORK EXACTLY: do NOT redraw, clean up, sharpen, move, or alter "
-    "any line from the input — the existing linework must appear unchanged in the output. "
-    "Color fills MAY carry volumetric relief shading — ambient occlusion at wall bases, "
-    "soft self-shadow and top-surface material highlights on furniture, gentle floor reflections — "
-    "to give the plan a raised, three-dimensional 'rendered floor plan' look, "
-    "as long as every object's footprint stays exactly where the input linework is. "
+    "Output is a FLAT orthographic top-down coloured floor plan — camera strictly 90° straight down, "
+    "NOT a tilted 3D photograph: zero perspective, zero axonometric tilt, zero visible vertical faces, "
+    "zero lens flare, zero sky, zero horizon, and zero shadows or relief. "
+    "Even, flat, pale colour fills only — no shading gradients, no dark areas. "
+    "Keep linework thin and light exactly as in the input; do NOT redraw, thicken, or move any line. "
     "Professional architectural presentation quality. "
     "Do NOT add new text, new dimension numbers, watermarks, borders, or people."
 )
@@ -957,10 +966,11 @@ def build_drawing_prompt(
         else:
             dtype_hint_2d = _SKETCH_HINT
         # _2D_GEOMETRY_LOCK đứng ĐẦU TIÊN — Gemini ưu tiên instruction đầu cao nhất.
-        # _RELIEF_3D_PLAN: nổi khối 3D phù điêu nhưng giữ orthographic 90° → overlay vẫn khớp.
+        # _FLAT_COLOR_2D: ép tô PHẲNG, KHÔNG bóng/relief → tránh nội dung tối gây doubling
+        # khi overlay_linework() dán nét gốc lại. (Shadow/relief đã bỏ — xem image_utils.py.)
         return _join([
             _2D_GEOMETRY_LOCK, base, dtype_hint_2d,
-            _HARD_SHADOW_PLAN, _RELIEF_3D_PLAN, user, QUALITY_SUFFIX_2D,
+            _FLAT_COLOR_2D, user, QUALITY_SUFFIX_2D,
         ])
 
 
