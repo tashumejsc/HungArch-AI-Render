@@ -159,12 +159,24 @@ def render(
     """Biến ảnh khối SketchUp thành ảnh render photorealistic."""
     aspect = _aspect_from_bytes(image_bytes)
 
-    parts: list = [_to_part(image_bytes, image_mime)]
-    full_prompt = prompt_text
     if reference_bytes:
-        parts.append(_to_part(reference_bytes, reference_mime))
+        # Gắn NHÃN TEXT trước MỖI ảnh để Gemini không nhầm vai trò.
+        # Nếu chỉ xếp [img_su, img_ref, prompt] thì Gemini bị hút về ảnh render
+        # chi tiết hơn (reference) và copy luôn bố cục → sai hình học.
         full_prompt = f"{prompt_text}\n\n{prompts.REFERENCE_INSTRUCTION}"
-    parts.append(full_prompt)
+        parts: list = [
+            "IMAGE 1 below is the PRIMARY INPUT — the SketchUp model. You MUST reproduce its "
+            "exact camera angle, geometry, spatial layout and composition in your render:",
+            _to_part(image_bytes, image_mime),
+            "IMAGE 2 below is a STYLE REFERENCE ONLY. Use it solely to match colour grading, "
+            "material finish and lighting mood. DO NOT copy its camera angle, layout, geometry, "
+            "furniture, objects, screen/signage content, text or composition:",
+            _to_part(reference_bytes, reference_mime),
+            full_prompt,
+        ]
+    else:
+        full_prompt = prompt_text
+        parts = [_to_part(image_bytes, image_mime), full_prompt]
 
     response = _generate(model_key, parts, aspect, resolution)
     img = _extract_image(response)

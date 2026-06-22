@@ -328,6 +328,19 @@
   display: block;
 }
 
+/* ───── Dropzone mini — góc nhìn bổ sung (đa góc) ───── */
+.dropzone.dropzone-mini {
+  min-height: 72px;
+  border-width: 1.5px;
+}
+.dropzone.dropzone-mini .ph {
+  font-size: 0.72rem;
+  padding: 0.4rem;
+}
+.dropzone.dropzone-mini .preview {
+  max-height: 84px;
+}
+
 /* Buttons */
 .btn-primary {
   background: linear-gradient(to bottom right, #fbbf24, #ea580c);
@@ -447,3 +460,40 @@
   pointer-events: none;
   position: relative;
 }
+
+/* ───── PDF page thumbnail grid (tab Bản vẽ 2D) ───── */
+.pdf-page-thumb {
+  position: relative;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.pdf-page-thumb.selected { opacity: 1; }
+.pdf-page-thumb .thumb-box {
+  aspect-ratio: 1.3 / 1;
+  border: 2px solid #334155;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+.pdf-page-thumb.selected .thumb-box { border-color: #f59e0b; }
+.pdf-page-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.pdf-page-thumb .check-badge {
+  position: absolute; top: 2px; right: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #f59e0b; color: #0f172a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px;
+}
+.pdf-page-thumb .pg-label { font-size: 0.62rem; color: #94a3b8; text-align: center; margin-top: 2px; }
+.pdf-page-thumb.selected .pg-label { color: #fbbf24; font-weight: 600; }
+.pdf-page-thumb .paper-label { font-size: 0.55rem; color: #64748b; text-align: center; }
+.pdf-page-thumb .blur-badge {
+  font-size: 0.5rem; color: #f87171; background: rgba(239,68,68,.15);
+  border-radius: 4px; padding: 1px 3px; text-align: center; margin-top: 1px;
+}
+
+/* ───── Scan toggle button (tab Bản vẽ 2D) ───── */
+.scan-toggle { background: #334155; }
+.scan-toggle.active { background: #f59e0b; }
+.scan-toggle.active span { left: 18px; background: #0f172a; }

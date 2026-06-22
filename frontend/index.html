@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HungArch AI Render</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="/css/style.css?v=1.0.6" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+  <link rel="stylesheet" href="/css/style.css?v=1.0.7" />
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
@@ -64,6 +65,23 @@
             <img class="preview hidden" />
             <div class="ph">📤 Kéo thả hoặc bấm để tải ảnh khối SketchUp</div>
           </div>
+          <!-- Đa góc nhìn — góc bổ sung đồng bộ style theo ảnh chính -->
+          <div class="mt-3">
+            <label class="lbl mb-1">📸 Góc nhìn bổ sung <span class="text-[10px] text-slate-500 font-normal">(đồng bộ style — tùy chọn)</span></label>
+            <p class="hint mb-2">Tải thêm ảnh SketchUp <b>cùng phòng, góc camera khác</b>. AI render đồng bộ tông màu &amp; vật liệu theo ảnh chính phía trên.</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="dropzone dropzone-mini" data-target="interiorAngle2">
+                <input type="file" accept="image/*" class="hidden" id="interiorAngle2" />
+                <img class="preview hidden" />
+                <div class="ph">＋ Góc 2</div>
+              </div>
+              <div class="dropzone dropzone-mini" data-target="interiorAngle3">
+                <input type="file" accept="image/*" class="hidden" id="interiorAngle3" />
+                <img class="preview hidden" />
+                <div class="ph">＋ Góc 3</div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="card">
           <label class="lbl">Phong cách</label>
@@ -84,6 +102,23 @@
             <input type="file" accept="image/*" class="hidden" id="exteriorImage" />
             <img class="preview hidden" />
             <div class="ph">📤 Kéo thả hoặc bấm để tải ảnh khối SketchUp</div>
+          </div>
+          <!-- Đa góc nhìn — góc bổ sung đồng bộ style theo ảnh chính -->
+          <div class="mt-3">
+            <label class="lbl mb-1">📸 Góc nhìn bổ sung <span class="text-[10px] text-slate-500 font-normal">(đồng bộ style — tùy chọn)</span></label>
+            <p class="hint mb-2">Tải thêm ảnh SketchUp <b>cùng công trình, góc camera khác</b>. AI render đồng bộ tông màu &amp; vật liệu theo ảnh chính phía trên.</p>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="dropzone dropzone-mini" data-target="exteriorAngle2">
+                <input type="file" accept="image/*" class="hidden" id="exteriorAngle2" />
+                <img class="preview hidden" />
+                <div class="ph">＋ Góc 2</div>
+              </div>
+              <div class="dropzone dropzone-mini" data-target="exteriorAngle3">
+                <input type="file" accept="image/*" class="hidden" id="exteriorAngle3" />
+                <img class="preview hidden" />
+                <div class="ph">＋ Góc 3</div>
+              </div>
+            </div>
           </div>
         </div>
         <!-- Bối cảnh + Thời tiết + Cây xanh gộp chung 1 card -->
@@ -114,11 +149,21 @@
       <!-- NHÓM 5: TAB BẢN VẼ 2D -->
       <div id="tab-drawing" class="tab-panel space-y-4 hidden">
         <div class="card">
-          <label class="lbl">Ảnh bản vẽ (AutoCAD / phác thảo tay)</label>
+          <label class="lbl">Ảnh bản vẽ (AutoCAD / phác thảo tay / PDF)</label>
           <div class="dropzone" data-target="drawingImage">
-            <input type="file" accept="image/*" class="hidden" id="drawingImage" />
+            <input type="file" accept="image/*,application/pdf" class="hidden" id="drawingImage" />
             <img class="preview hidden" />
-            <div class="ph">📐 Kéo thả hoặc bấm để tải ảnh bản vẽ AutoCAD / phác thảo</div>
+            <div class="ph">📐 Kéo thả hoặc bấm để tải ảnh / PDF bản vẽ<br><span style="font-size:0.72rem; color:#64748b;">Hỗ trợ: PNG, JPG, PDF (nhiều trang)</span></div>
+          </div>
+          <div id="pdfPageGrid" class="hidden mt-3">
+            <div class="flex items-center gap-2 mb-2">
+              <i class="ti ti-file-type-pdf text-red-400"></i>
+              <span id="pdfFileName" class="text-xs font-semibold text-slate-200 flex-1 truncate"></span>
+              <span id="pdfPageCountBadge" class="text-[10px] text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full whitespace-nowrap"></span>
+            </div>
+            <p class="hint">Bấm vào từng trang để chọn / bỏ chọn render</p>
+            <div id="pdfPageThumbs" class="grid grid-cols-5 gap-2"></div>
+            <p id="pdfSelectionNote" class="hint mt-2"></p>
           </div>
         </div>
 
@@ -130,6 +175,19 @@
               <button id="dtAutocad" class="input-type-btn flex-1 active" data-dtype="autocad">📐 AutoCAD / Kỹ thuật</button>
               <button id="dtSketch"  class="input-type-btn flex-1" data-dtype="sketch">✏️ Phác thảo tay</button>
             </div>
+          </div>
+
+          <!-- Scan toggle — chỉ hiện khi Loại bản vẽ = AutoCAD -->
+          <div id="scanToggleRow" class="flex items-center justify-between gap-3 bg-[#0d1525] border border-slate-700/60 rounded-lg px-3 py-2">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">📷 Đây là ảnh chụp / scan chất lượng thấp</div>
+              <div class="text-[10px] text-slate-400 mt-0.5 leading-snug">Áp dụng cho mọi trang đã chọn — mờ, nghiêng, lóa sáng, watermark</div>
+            </div>
+            <button id="scanToggleBtn" type="button"
+                    class="scan-toggle flex-shrink-0 w-9 h-5 rounded-full relative transition-colors"
+                    aria-pressed="false">
+              <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-slate-400 transition-all"></span>
+            </button>
           </div>
 
           <!-- Kết quả muốn tạo -->
@@ -145,14 +203,15 @@
 
           <p class="drawing-branch-arrow">↓</p>
 
-          <!-- Nội thất / Ngoại thất (chỉ hiện khi 3D) -->
+          <!-- Nội thất / Ngoại thất (3D) hoặc Mặt bằng phòng / Tổng thể (2D) -->
           <div id="drawingOutputWrap">
             <label class="lbl">Loại phối cảnh 3D</label>
             <div class="flex gap-2 mt-1">
               <button id="doInterior" class="input-type-btn flex-1 active" data-doutput="interior">🛋️ Nội thất (mặt bằng)</button>
               <button id="doExterior" class="input-type-btn flex-1" data-doutput="exterior">🏙️ Ngoại thất (mặt đứng)</button>
             </div>
-            <p class="drawing-branch-hint">Chọn "Nội thất" → hiện Phong cách. Chọn "Ngoại thất" → hiện Bối cảnh + Thời tiết.</p>
+            <p id="drawingOutputBranchHint" class="drawing-branch-hint">Chọn "Nội thất" → hiện Phong cách. Chọn "Ngoại thất" → hiện Bối cảnh + Thời tiết.</p>
+            <p id="drawingOutputHint" class="hint hidden mt-1"></p>
           </div>
 
           <!-- Phong cách nội thất (chỉ hiện khi 3D + Nội thất) -->
@@ -499,8 +558,8 @@
 
   <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 hidden px-4 py-2 rounded-lg text-sm shadow-lg z-50"></div>
 
-  <script src="/js/api.js?v=1.0.6"></script>
-  <script src="/js/mask.js?v=1.0.6"></script>
-  <script src="/js/app.js?v=1.0.6"></script>
+  <script src="/js/api.js?v=1.0.7"></script>
+  <script src="/js/mask.js?v=1.0.7"></script>
+  <script src="/js/app.js?v=1.0.7"></script>
 </body>
 </html>

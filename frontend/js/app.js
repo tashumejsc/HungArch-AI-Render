@@ -6,6 +6,9 @@
     exteriorImage: null,
     drawingImage:  null,
     referenceImage: null,
+    // Đa góc nhìn — góc bổ sung (đồng bộ style)
+    interiorAngle2: null, interiorAngle3: null,
+    exteriorAngle2: null, exteriorAngle3: null,
   };
   let currentTab = 'interior';
   let currentResult    = null;
@@ -30,6 +33,11 @@
   let currentDrawingMode   = '3d_perspective';  // '3d_perspective' | '2d_render'
   let currentDrawingType   = 'autocad';         // 'autocad' | 'sketch'
   let currentDrawingOutput = 'interior';        // 'interior' | 'exterior' (chỉ cho 3d_perspective)
+
+  // PDF upload state (tab Bản vẽ 2D)
+  let pdfPages   = [];       // [{page_token, page_index, thumbnail_base64, paper_label, is_blurry, selected}]
+  let isPdfMode  = false;    // true nếu file đang tải lên tab Bản vẽ 2D là PDF
+  let isScanInput = false;   // true nếu bản vẽ AutoCAD là ảnh chụp/scan kém chất lượng
 
   // Hậu kỳ
   let _currentHueRotate = 0;
@@ -98,11 +106,24 @@
       const ph    = dz.querySelector('.ph');
 
       const show = (file) => {
+        // PDF → upload để tách trang, không xử lý như ảnh thường
+        if (targetId === 'drawingImage' && file.type === 'application/pdf') {
+          uploadPdfForPreview(file);
+          return;
+        }
+        // Ảnh thường cho drawingImage → reset PDF state nếu có
+        if (targetId === 'drawingImage') {
+          isPdfMode = false;
+          pdfPages  = [];
+          $('pdfPageGrid')?.classList.add('hidden');
+          updateRenderBtnLabel();
+        }
         files[targetId] = file;
         img.src = URL.createObjectURL(file);
         img.classList.remove('hidden');
         ph.classList.add('hidden');
         updateTabDots();
+        updateRenderBtnLabel();
       };
 
       dz.addEventListener('click', () => input.click());
@@ -129,6 +150,7 @@
         $('tab-exterior').classList.toggle('hidden', currentTab !== 'exterior');
         $('tab-drawing').classList.toggle('hidden',  currentTab !== 'drawing');
         updateVegetationVisibility();
+        updateRenderBtnLabel();
       });
     });
     document.querySelector('.tab-btn[data-tab="interior"]').classList.add('active');
@@ -140,7 +162,7 @@
   const DRAWING_MODE_HINTS = {
     '3d_perspective_interior': 'AI đọc mặt bằng và tưởng tượng phối cảnh nội thất 3D thực tế.',
     '3d_perspective_exterior': 'AI đọc mặt đứng và tạo phối cảnh ngoại thất 3D với bối cảnh thực tế.',
-    '2d_render':               'AI giữ nguyên góc nhìn 2D, chỉ nâng lên chất lượng trình bày đẹp hơn.',
+    '2d_render':               'AI giữ nguyên góc nhìn top-down, làm đẹp đường nét + tô màu vật liệu + bóng đổ kiểu LayOut SketchUp.',
   };
 
   function _updateDrawingHint() {
@@ -153,13 +175,34 @@
   function _syncDrawingControls() {
     const is3d = currentDrawingMode === '3d_perspective';
     const isExt = currentDrawingOutput === 'exterior';
-    // Ẩn/hiện khu output toggle (chỉ cho 3D)
-    $('drawingOutputWrap').classList.toggle('hidden', !is3d);
-    // Ẩn/hiện style nội thất
+    // drawingOutputWrap luôn hiện: 3D chọn nội/ngoại thất; 2D chọn floor_plan/site_plan
+    // Ẩn/hiện style nội thất (chỉ cho 3D + Nội thất)
     $('drawingStyleWrap').classList.toggle('hidden', !is3d || isExt);
-    // Ẩn/hiện bối cảnh + thời tiết ngoại thất
+    // Ẩn/hiện bối cảnh + thời tiết ngoại thất (chỉ cho 3D + Ngoại thất)
     $('drawingExtWrap').classList.toggle('hidden', !is3d || !isExt);
     _updateDrawingHint();
+  }
+
+  const _OUTPUT_HINTS_2D = {
+    interior: 'Tô màu vật liệu sàn theo từng phòng, đồ nội thất dạng khối phẳng — đúng kiểu mặt bằng layout.',
+    exterior: 'Tô màu cây xanh, đường nội bộ, hồ nước, bãi đỗ xe — đúng kiểu mặt bằng tổng thể/cảnh quan.',
+  };
+
+  function _updateDrawingOutputHint() {
+    $('drawingOutputHint').textContent =
+      _OUTPUT_HINTS_2D[currentDrawingOutput] || _OUTPUT_HINTS_2D.interior;
+  }
+
+  function updateDrawingOutputLabels() {
+    const is2d = currentDrawingMode === '2d_render';
+    $('doInterior').textContent = is2d ? '📐 Mặt bằng phòng/tầng' : '🛋️ Nội thất (mặt bằng)';
+    $('doExterior').textContent = is2d ? '🌳 Mặt bằng tổng thể'  : '🏙️ Ngoại thất (mặt đứng)';
+    $('drawingOutputWrap').querySelector('.lbl').textContent =
+      is2d ? 'Loại mặt bằng 2D' : 'Loại phối cảnh 3D';
+    // Ẩn/hiện hint: 3D dùng branch hint, 2D dùng hint mô tả output
+    $('drawingOutputBranchHint').classList.toggle('hidden', is2d);
+    $('drawingOutputHint').classList.toggle('hidden', !is2d);
+    if (is2d) _updateDrawingOutputHint();
   }
 
   function initDrawingTab() {
@@ -170,6 +213,7 @@
         $('dm3d').classList.toggle('active', currentDrawingMode === '3d_perspective');
         $('dm2d').classList.toggle('active', currentDrawingMode === '2d_render');
         _syncDrawingControls();
+        updateDrawingOutputLabels();
       });
     });
 
@@ -180,6 +224,7 @@
         $('doInterior').classList.toggle('active', currentDrawingOutput === 'interior');
         $('doExterior').classList.toggle('active', currentDrawingOutput === 'exterior');
         _syncDrawingControls();
+        if (currentDrawingMode === '2d_render') _updateDrawingOutputHint();
       });
     });
 
@@ -189,8 +234,101 @@
         currentDrawingType = $(id).dataset.dtype;
         $('dtAutocad').classList.toggle('active', currentDrawingType === 'autocad');
         $('dtSketch').classList.toggle('active',  currentDrawingType === 'sketch');
+        // Scan toggle chỉ hiện khi AutoCAD — phác thảo tay không cần
+        $('scanToggleRow').classList.toggle('hidden', currentDrawingType !== 'autocad');
+        if (currentDrawingType !== 'autocad') {
+          isScanInput = false;
+          $('scanToggleBtn').classList.remove('active');
+          $('scanToggleBtn').setAttribute('aria-pressed', 'false');
+          $('scanToggleBtn').querySelector('span').style.left = '';
+        }
       });
     });
+
+    // Scan toggle
+    $('scanToggleBtn').addEventListener('click', () => {
+      isScanInput = !isScanInput;
+      $('scanToggleBtn').classList.toggle('active', isScanInput);
+      $('scanToggleBtn').setAttribute('aria-pressed', String(isScanInput));
+    });
+  }
+
+  // ══════════════════════════════════════════════
+  //  PDF upload + preview (tab Bản vẽ 2D)
+  // ══════════════════════════════════════════════
+  async function uploadPdfForPreview(file) {
+    isPdfMode = true;
+    $('pdfPageGrid').classList.remove('hidden');
+    $('pdfFileName').textContent = file.name;
+    $('pdfPageThumbs').innerHTML = '<span class="hint">Đang xử lý PDF...</span>';
+
+    const fd = new FormData();
+    fd.append('pdf', file);
+    let data;
+    try {
+      const res = await fetch('/api/pdf-preview', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Lỗi xử lý PDF.');
+      }
+      data = await res.json();
+    } catch (e) {
+      $('pdfPageThumbs').innerHTML = `<span class="hint text-red-400">${e.message}</span>`;
+      return;
+    }
+
+    pdfPages = data.pages.map(p => ({ ...p, selected: true }));
+    $('pdfPageCountBadge').textContent = `${data.page_count} trang`;
+    renderPdfPageThumbs();
+  }
+
+  function renderPdfPageThumbs() {
+    const grid = $('pdfPageThumbs');
+    grid.innerHTML = '';
+    pdfPages.forEach((p, idx) => {
+      const el = document.createElement('div');
+      el.className = 'pdf-page-thumb' + (p.selected ? ' selected' : '');
+      el.innerHTML = `
+        <div class="thumb-box">
+          <img src="data:image/png;base64,${p.thumbnail_base64}" />
+          ${p.selected ? '<span class="check-badge"><i class="ti ti-check"></i></span>' : ''}
+        </div>
+        <div class="pg-label">Tr.${p.page_index + 1}</div>
+        <div class="paper-label">${p.paper_label}</div>
+        ${p.is_blurry ? '<div class="blur-badge"><i class="ti ti-alert-triangle"></i> Mờ</div>' : ''}
+      `;
+      el.addEventListener('click', () => {
+        pdfPages[idx].selected = !pdfPages[idx].selected;
+        renderPdfPageThumbs();
+      });
+      grid.appendChild(el);
+    });
+    updatePdfSelectionNote();
+  }
+
+  function updatePdfSelectionNote() {
+    const selected = pdfPages.filter(p => p.selected);
+    const anyBlurrySelected = selected.some(p => p.is_blurry);
+    let note = `Đã chọn <b class="text-amber-400">${selected.length}</b>/${pdfPages.length} trang — sẽ tạo <b class="text-amber-400">${selected.length}</b> ảnh render riêng biệt.`;
+    if (anyBlurrySelected) {
+      note += ` <span class="text-red-400">⚠ Có trang nghi bị mờ — đề xuất bật "ảnh chụp/scan chất lượng thấp" bên dưới.</span>`;
+    }
+    $('pdfSelectionNote').innerHTML = note;
+    updateRenderBtnLabel();
+  }
+
+  function updateRenderBtnLabel() {
+    const btn = $('renderBtn');
+    if (!btn) return;
+    if (currentTab === 'drawing' && isPdfMode) {
+      const n = pdfPages.filter(p => p.selected).length;
+      btn.textContent = n > 0 ? `⚡ Render ${n} trang đã chọn` : '✨ TẠO RENDER';
+    } else if (currentTab === 'interior' || currentTab === 'exterior') {
+      const extra = _extraAngleFiles().length;
+      btn.textContent = extra > 0 ? `📸 Render ${extra + 1} góc đồng bộ` : '✨ TẠO RENDER';
+    } else {
+      btn.textContent = '✨ TẠO RENDER';
+    }
   }
 
   // ══════════════════════════════════════════════
@@ -566,6 +704,9 @@
     };
 
     $('resultPlaceholder').classList.add('hidden');
+    // Dọn gallery PDF nếu còn hiển thị từ lần render trước
+    const _gallery = $('pdfResultGallery');
+    if (_gallery) _gallery.remove();
     $('maskCanvas').classList.remove('hidden');
     await maskTool.load(data.image_url);
     stopMaskMode();
@@ -612,6 +753,10 @@
   //  Render (xử lý cả 3 tab)
   // ══════════════════════════════════════════════
   async function doRender() {
+    // PDF mode: rẽ nhánh render từng trang đã chọn thay vì 1 ảnh đơn
+    if (currentTab === 'drawing' && isPdfMode && pdfPages.length > 0) {
+      return doRenderPdfPages();
+    }
     const imgFile = currentTab === 'interior' ? files.interiorImage
                   : currentTab === 'exterior' ? files.exteriorImage
                   : files.drawingImage;
@@ -625,6 +770,14 @@
       );
       return;
     }
+
+    // Đa góc nhìn: nếu có góc phụ (chỉ nội/ngoại thất) → render đồng bộ style
+    const extraAngles = _extraAngleFiles();
+    if ((currentTab === 'interior' || currentTab === 'exterior') && extraAngles.length > 0) {
+      return doRenderMulti(imgFile, extraAngles);
+    }
+    // Dọn gallery đa góc cũ nếu còn (render đơn)
+    _removeEl('multiAngleGallery');
 
     pendingBeforeUrl = URL.createObjectURL(imgFile);
 
@@ -673,6 +826,7 @@
       fd.append('drawing_mode',   currentDrawingMode);
       fd.append('drawing_type',   currentDrawingType);
       fd.append('drawing_output', currentDrawingOutput);
+      fd.append('is_scan',        String(isScanInput));
       fd.append('prompt',         $('drawingPrompt').value);
       if (currentDrawingOutput === 'exterior') {
         fd.append('context', $('drawingContextSelect').value);
@@ -702,6 +856,210 @@
       setLoading(false);
       $('renderBtn').disabled = false;
     }
+  }
+
+  // ══════════════════════════════════════════════
+  //  Đa góc nhìn — render nhiều góc đồng bộ style (B)
+  // ══════════════════════════════════════════════
+  function _removeEl(id) { const e = $(id); if (e) e.remove(); }
+
+  function _extraAngleFiles() {
+    if (currentTab === 'interior') return [files.interiorAngle2, files.interiorAngle3].filter(Boolean);
+    if (currentTab === 'exterior') return [files.exteriorAngle2, files.exteriorAngle3].filter(Boolean);
+    return [];
+  }
+
+  // Dựng FormData render cho tab nội/ngoại thất hiện tại, với 1 ảnh + reference tùy chọn.
+  function _buildAngleFD(imgFile, referenceBlob) {
+    const fd = new FormData();
+    fd.append('mode',       currentTab);
+    fd.append('image',      imgFile);
+    fd.append('model',      $('modelSelect').value);
+    fd.append('resolution', $('resolutionSelect').value);
+    fd.append('seed',       '');
+    fd.append('lighting',   $('lightingSelect').value);
+    fd.append('vegetation', $('vegetationSelect').value);
+    fd.append('input_type', currentInputType);
+    if (referenceBlob) fd.append('reference_image', referenceBlob, 'styleref.png');
+    if (currentTab === 'interior') {
+      fd.append('style',   $('styleSelect').value);
+      fd.append('prompt',  $('interiorPrompt').value);
+    } else {
+      fd.append('context', $('contextSelect').value);
+      fd.append('weather', $('weatherSelect').value);
+      fd.append('prompt',  $('exteriorPrompt').value);
+    }
+    return fd;
+  }
+
+  async function doRenderMulti(primaryFile, extraAngles) {
+    const angles = [primaryFile, ...extraAngles];
+    const total  = angles.length;
+
+    // Thiết lập trạng thái gốc cho hậu kỳ (áp dụng trên góc chính = góc 1)
+    pendingBeforeUrl     = URL.createObjectURL(primaryFile);
+    originalSourceFile   = primaryFile;
+    originalRefFile      = files.referenceImage || null;
+    originalRenderParams = {
+      mode: currentTab, input_type: currentInputType,
+      lighting: $('lightingSelect').value, vegetation: $('vegetationSelect').value,
+      style:   currentTab === 'interior' ? $('styleSelect').value : '',
+      context: currentTab === 'exterior' ? $('contextSelect').value : '',
+      weather: currentTab === 'exterior' ? $('weatherSelect').value : '',
+      prompt:  currentTab === 'interior' ? $('interiorPrompt').value : $('exteriorPrompt').value,
+    };
+    appliedEdits = [];
+    $('rebaseRenderBtn').classList.add('hidden');
+    if ($('ppRebaseBtn')) $('ppRebaseBtn').disabled = true;
+    _removeEl('multiAngleGallery');
+    _removeEl('pdfResultGallery');
+
+    $('renderBtn').disabled = true;
+    const results = [];
+    // Góc 1 dùng reference của người dùng (nếu có); sau đó góc 1 trở thành style ref.
+    let styleRefBlob = files.referenceImage || null;
+
+    for (let i = 0; i < total; i++) {
+      setLoading(true, `⏳ Render góc ${i + 1}/${total} (đồng bộ style)…`);
+      try {
+        const data = await API.render(_buildAngleFD(angles[i], styleRefBlob));
+        results.push({ angle: i + 1, ...data });
+        // Sau góc chính: dùng ảnh góc 1 làm style reference cho các góc còn lại.
+        if (i === 0) {
+          styleRefBlob = await (await fetch(data.image_url)).blob();
+        }
+      } catch (e) {
+        results.push({ angle: i + 1, error: e.message });
+      }
+    }
+
+    setLoading(false);
+    $('renderBtn').disabled = false;
+    showMultiAngleResults(results);
+
+    const ok = results.filter(r => !r.error).length;
+    toast(
+      ok === total ? `Xong! ${ok} góc nhìn đồng bộ.` : `Hoàn thành: ${ok}/${total} góc OK.`,
+      ok === total
+    );
+  }
+
+  function showMultiAngleResults(results) {
+    // Hiển thị góc chính (góc OK đầu tiên) vào viewer + bật hậu kỳ.
+    const firstOk = results.find(r => !r.error);
+    if (firstOk) showResult(firstOk);
+
+    // Gallery toàn bộ góc, chèn ngay trước #resultActions.
+    let gal = $('multiAngleGallery');
+    if (!gal) {
+      gal = document.createElement('div');
+      gal.id = 'multiAngleGallery';
+      gal.className = 'grid grid-cols-3 gap-2 p-2';
+      $('resultActions').parentNode.insertBefore(gal, $('resultActions'));
+    }
+    gal.innerHTML = results.map(r => {
+      if (r.error) {
+        return `<div class="aspect-square bg-slate-800 border border-red-500/40 rounded-lg flex items-center justify-center p-2">
+          <span class="text-[10px] text-red-400 text-center">Góc ${r.angle}: ${r.error}</span>
+        </div>`;
+      }
+      return `<div class="relative aspect-square bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        <img src="${r.image_url}" class="w-full h-full object-cover cursor-pointer multi-angle-thumb"
+             data-url="${r.image_url}" data-seed="${r.seed}" data-file="${r.image_filename}"
+             title="Góc ${r.angle} — ${r.seed}" />
+        <span class="absolute bottom-1 left-1 text-[9px] bg-slate-900/80 text-amber-400 px-1.5 py-0.5 rounded">Góc ${r.angle}</span>
+      </div>`;
+    }).join('');
+    gal.querySelectorAll('.multi-angle-thumb').forEach(el => {
+      el.addEventListener('click', () => {
+        pendingBeforeUrl = null;
+        showResult({ image_url: el.dataset.url, seed: el.dataset.seed, image_filename: el.dataset.file });
+      });
+    });
+    $('resultActions').classList.remove('hidden');
+  }
+
+  // ══════════════════════════════════════════════
+  //  Render PDF nhiều trang
+  // ══════════════════════════════════════════════
+  async function doRenderPdfPages() {
+    const selected = pdfPages.filter(p => p.selected);
+    if (selected.length === 0) {
+      toast('Hãy chọn ít nhất 1 trang để render.', false);
+      return;
+    }
+    _removeEl('multiAngleGallery');
+    $('renderBtn').disabled = true;
+    const results = [];
+    for (const [idx, page] of selected.entries()) {
+      setLoading(true, `⏳ Render trang ${page.page_index + 1}… (${idx + 1}/${selected.length})`);
+      const fd = new FormData();
+      fd.append('page_token',     page.page_token);
+      fd.append('drawing_mode',   currentDrawingMode);
+      fd.append('drawing_type',   currentDrawingType);
+      fd.append('drawing_output', currentDrawingOutput);
+      fd.append('is_scan',        String(isScanInput));
+      fd.append('prompt',         $('drawingPrompt').value);
+      fd.append('model',          $('modelSelect').value);
+      fd.append('resolution',     $('resolutionSelect').value);
+      fd.append('lighting',       $('lightingSelect').value);
+      if (currentDrawingOutput === 'exterior') {
+        fd.append('context', $('drawingContextSelect').value);
+        fd.append('weather', $('drawingWeatherSelect').value);
+      } else {
+        fd.append('style', $('drawingStyleSelect').value);
+      }
+      try {
+        const res = await fetch('/api/render-pdf-page', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Lỗi render trang ${page.page_index + 1}`);
+        }
+        const data = await res.json();
+        results.push({ pageIndex: page.page_index, ...data });
+      } catch (e) {
+        results.push({ pageIndex: page.page_index, error: e.message });
+      }
+    }
+    setLoading(false);
+    $('renderBtn').disabled = false;
+    showPdfPageResults(results);
+    const ok = results.filter(r => !r.error).length;
+    const fail = results.length - ok;
+    toast(
+      fail > 0
+        ? `Hoàn thành: ${ok} trang OK, ${fail} trang lỗi.`
+        : `Xong! ${ok} ảnh render.`,
+      fail === 0
+    );
+  }
+
+  function showPdfPageResults(results) {
+    // Lấy hoặc tạo gallery container, đặt ngay trước #resultActions trong card kết quả
+    let galleryEl = $('pdfResultGallery');
+    if (!galleryEl) {
+      galleryEl = document.createElement('div');
+      galleryEl.id = 'pdfResultGallery';
+      galleryEl.className = 'grid grid-cols-3 gap-2 p-2';
+      $('resultActions').parentNode.insertBefore(galleryEl, $('resultActions'));
+    }
+    $('resultPlaceholder').classList.add('hidden');
+    galleryEl.innerHTML = results.map(r => {
+      if (r.error) {
+        return `<div class="aspect-square bg-slate-800 border border-red-500/40 rounded-lg flex items-center justify-center p-2">
+          <span class="text-[10px] text-red-400 text-center">Trang ${r.pageIndex + 1}: ${r.error}</span>
+        </div>`;
+      }
+      return `<div class="relative aspect-square bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        <img src="${r.image_url}" class="w-full h-full object-cover cursor-pointer"
+             title="Trang ${r.pageIndex + 1} — ${r.seed}"
+             onclick="window.open('${r.image_url}','_blank')" />
+        <span class="absolute bottom-1 left-1 text-[9px] bg-slate-900/80 text-amber-400 px-1.5 py-0.5 rounded">
+          Tr.${r.pageIndex + 1}
+        </span>
+      </div>`;
+    }).join('');
+    $('resultActions').classList.remove('hidden');
   }
 
   // ══════════════════════════════════════════════
