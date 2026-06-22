@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**HungArch AI Render v1.0.0** — local web app for architects that transforms rough SketchUp massing model screenshots into photorealistic renders. Also converts 2D drawings (floor plans, elevations) into 3D perspectives. Runs entirely on the user's machine; internet required only for AI API calls.
+**HungArch AI Render v1.0.1** — local web app for architects that transforms rough SketchUp massing model screenshots into photorealistic renders. Also converts 2D drawings (floor plans, elevations) into 3D perspectives. Runs entirely on the user's machine; internet required only for AI API calls.
 
 ## Running the App
 

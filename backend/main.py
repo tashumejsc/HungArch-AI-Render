@@ -1,4 +1,4 @@
-"""HungArch AI Render — FastAPI app (Gemini-only, v1.0.0).
+"""HungArch AI Render — FastAPI app (Gemini-only, v1.0.1).
 
 10 endpoint API:
   GET  /api/presets           — danh sách preset + model cho frontend
@@ -32,7 +32,7 @@ class KeyConfig(BaseModel):
     gemini_api_key: str | None = None
 
 
-app = FastAPI(title="HungArch AI Render", version="1.0.0")
+app = FastAPI(title="HungArch AI Render", version="1.0.1")
 
 
 def _require_license() -> None:
