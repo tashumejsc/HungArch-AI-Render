@@ -69,8 +69,15 @@ _INTERIOR_STYLE_CLAMP = (
     "add. DO NOT add, remove, move, resize, duplicate or replace any furniture, cabinet, island, "
     "lighting fixture, appliance, rug, plant or decorative object. If the style names an item "
     "(e.g. a pendant, an island, a vase, a painting) that is NOT already physically present in the "
-    "input model, IGNORE that item entirely. The render must contain EXACTLY the same objects, at "
-    "the same sizes, shapes and positions, as the input clay model — only their materials are new."
+    "input model, IGNORE that item entirely. "
+    "EXACT FURNITURE COUNT — this is critical and the most common mistake to avoid: the output must "
+    "contain the EXACT SAME set and NUMBER of furniture pieces as the clay model — no more, no fewer. "
+    "DO NOT add any extra seating (sofa, sofa set, armchair, bench, lounge chairs, extra dining "
+    "chairs), table, console, shelving or decor to 'furnish', 'complete' or 'fill' the room, EVEN IF "
+    "an area looks empty or the style name implies a fuller 'living' space. Any empty floor area — "
+    "especially near a window or along a wall — MUST stay empty unless a real object is clearly "
+    "visible there in the input model. The render must contain EXACTLY the same objects, in the same "
+    "count, at the same sizes, shapes and positions, as the input clay model — only materials are new."
 )
 
 # ---------------------------------------------------------------------------
