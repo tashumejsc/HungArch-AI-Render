@@ -777,17 +777,40 @@ DRAWING_ELEVATION_TO_3D = (
 # Tham chiếu giáo trình V-Ray 7 (Camera Type: Standard, Field of View deg theo khổ ảnh)
 # và giáo trình SketchUp (Camera > Top, không bật Parallel Projection ở kỹ thuật này).
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# KHÓA HÌNH HỌC CHO TOP-VIEW 3D — ưu tiên CAO NHẤT, đặt ĐẦU chuỗi prompt.
+# Đây là điểm quan trọng nhất: footprint/bố cục/tỷ lệ đầu ra phải trùng đầu vào.
+# Cảnh 3D được dựng ĐÈ LÊN bản vẽ gốc như một template khóa cứng, chỉ thêm chiều
+# cao + vật liệu + nội thất + ánh sáng, TUYỆT ĐỐI không đổi layout.
+# ---------------------------------------------------------------------------
+_TOPVIEW_GEOMETRY_LOCK = (
+    "GEOMETRY LOCK — HIGHEST PRIORITY, ZERO TOLERANCE: the input 2D drawing defines the EXACT "
+    "footprint your 3D scene must be built on. Every wall, room boundary, partition, door and "
+    "window opening, column, stair, balcony and the overall outline must appear in the output "
+    "at the IDENTICAL position, size, proportion and orientation as in the input — as if the 3D "
+    "scene were modelled directly on top of the input plan used as a locked tracing template. "
+    "DO NOT move, resize, rotate, add, remove, merge, split or rearrange any room or wall; "
+    "DO NOT change the number of rooms, the room proportions, or the overall aspect ratio of the "
+    "plan; DO NOT re-imagine or redraw the layout. The rendered plan outline must overlay the "
+    "input plan outline almost 1:1 (near-perfect registration). "
+    "You may ONLY add, ON TOP of this fixed 2D layout: real 3D height/volume, materials, "
+    "furniture, lighting and shadows — never alter the layout itself. "
+    "If any room ends up in a different place, a different size, or a different shape than the "
+    "input, the result is a failure and must be rejected."
+)
+
 _TOPVIEW_3D_CAMERA = (
-    "CAMERA SETUP — this is critical, this is a 'Top-View 3D Floor Plan' render, "
-    "NOT a flat orthographic CAD plan and NOT a true 90° architectural drawing: "
-    "place a standard perspective camera almost directly above the floor plan, looking "
-    "down at roughly 75–85° from the horizontal (i.e. just shy of straight-down), with a "
-    "narrow-to-moderate field of view (roughly 30–45°), positioned high enough to frame "
-    "the entire plan. This small amount of residual perspective is intentional and "
-    "essential — it must still read as a real 3D photograph taken from above, not a "
-    "flattened 2D diagram. The viewer should clearly see the sides/fronts of furniture "
-    "(headboards, sofa backs, armrests, cabinet faces) exactly the way a real photo from "
-    "a high vantage point would reveal them — never perfectly flat top silhouettes."
+    "CAMERA SETUP — this is critical: a NEAR-OVERHEAD 'Top-View 3D Floor Plan' camera. "
+    "Place a standard perspective camera almost perfectly straight above the plan, looking "
+    "down at roughly 85–88° from the horizontal — about 95% of the way to a true overhead "
+    "view, with only a few degrees of residual tilt. Use a NARROW, near-telephoto field of "
+    "view (roughly 20–30°) from a high position so perspective distortion is minimal and the "
+    "rendered plan's outline lines up almost EXACTLY with the input plan's footprint. "
+    "The tiny residual tilt is intentional — it gives just enough 3D depth to reveal a thin "
+    "sliver of furniture sides and to cast soft, real 3D contact shadows, so the result reads "
+    "as a real photograph from above rather than a flat 2D diagram. "
+    "Do NOT increase the tilt into an oblique or isometric view: footprint alignment with the "
+    "input plan must stay near-perfect, the camera stays essentially top-down."
 )
 
 DRAWING_TO_2D_FLOOR_PLAN = (
@@ -950,7 +973,11 @@ def build_drawing_prompt(
         # trực tiếp 'floor_plan'/'site_plan'.
         is_site_plan = drawing_output in ("exterior", "site_plan")
         base = DRAWING_TO_2D_SITE_PLAN if is_site_plan else DRAWING_TO_2D_FLOOR_PLAN
-        return _join([base, dtype_hint, _TOPVIEW_3D_CAMERA, _ROOM_LABEL_OVERLAY, user, QUALITY_SUFFIX_2D])
+        # _TOPVIEW_GEOMETRY_LOCK đặt ĐẦU TIÊN — geometry lock là ưu tiên cao nhất.
+        return _join([
+            _TOPVIEW_GEOMETRY_LOCK, base, dtype_hint,
+            _TOPVIEW_3D_CAMERA, _ROOM_LABEL_OVERLAY, user, QUALITY_SUFFIX_2D,
+        ])
 
 
 def build_text_edit_prompt(instruction: str) -> str:
