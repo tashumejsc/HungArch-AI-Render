@@ -59,6 +59,36 @@ GEOMETRY_LOCK_TEXTURED = (
 )
 
 # ---------------------------------------------------------------------------
+# KẸP PHONG CÁCH (interior) — style chỉ là BẢNG MÀU/VẬT LIỆU, KHÔNG phải danh sách
+# đồ nội thất để thêm vào. Ngăn Gemini "mua sắm" thêm đèn/đảo bếp/ghế/cây theo style.
+# ---------------------------------------------------------------------------
+_INTERIOR_STYLE_CLAMP = (
+    "STYLE = MATERIAL PALETTE ONLY: the style description above lists materials, colours, finishes "
+    "and a mood. Apply them ONLY as surface materials, finishes and lighting onto the objects and "
+    "surfaces ALREADY present in the input model. The style is NOT a shopping list of furniture to "
+    "add. DO NOT add, remove, move, resize, duplicate or replace any furniture, cabinet, island, "
+    "lighting fixture, appliance, rug, plant or decorative object. If the style names an item "
+    "(e.g. a pendant, an island, a vase, a painting) that is NOT already physically present in the "
+    "input model, IGNORE that item entirely. The render must contain EXACTLY the same objects, at "
+    "the same sizes, shapes and positions, as the input clay model — only their materials are new."
+)
+
+# ---------------------------------------------------------------------------
+# KẸP CÔNG TRÌNH (exterior) — bối cảnh/thời tiết/cây xanh chỉ áp cho MÔI TRƯỜNG quanh
+# nhà; bản thân công trình bị khóa cứng (không restyle/đổi tỷ lệ/thêm tầng).
+# ---------------------------------------------------------------------------
+_EXTERIOR_BUILDING_LOCK = (
+    "BUILDING IS LOCKED, ONLY THE ENVIRONMENT IS ADDED: the context, weather, lighting and "
+    "vegetation described below apply ONLY to the surroundings AROUND the building (sky, ground, "
+    "street, neighbouring structures, plants, people, vehicles, atmosphere). The BUILDING ITSELF — "
+    "its massing, facade, every wall / window / door / balcony / railing / roof line, and its exact "
+    "proportions and dimensions — must stay EXACTLY as in the input model. DO NOT restyle, "
+    "re-proportion, extend, simplify, add storeys to, or remove any part of the building; only apply "
+    "realistic materials and lighting onto its existing geometry. Add the described environment "
+    "AROUND the locked building — never reshape the building to fit the scene."
+)
+
+# ---------------------------------------------------------------------------
 # PROMPT NÂNG CAO CHẤT LƯỢNG ẢNH RENDER (AI Enhance — gọi từ /api/enhance)
 # ---------------------------------------------------------------------------
 ENHANCE_PROMPT = (
@@ -669,7 +699,8 @@ def build_interior_prompt(
 
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("interior", "")
     user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
-    return _join([lock, style, light, user, QUALITY_SUFFIX])
+    # _INTERIOR_STYLE_CLAMP ngay sau style để kẹp lại: style chỉ là palette, không thêm đồ.
+    return _join([lock, style, _INTERIOR_STYLE_CLAMP, light, user, QUALITY_SUFFIX])
 
 
 def build_exterior_prompt(
@@ -701,7 +732,8 @@ def build_exterior_prompt(
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("exterior", "")
     veg = VEGETATION_DENSITY.get(vegetation_key, {}).get("prompt", "")
     user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
-    return _join([lock, context, weather, light, veg, user, QUALITY_SUFFIX])
+    # _EXTERIOR_BUILDING_LOCK đứng ngay sau lock: bối cảnh chỉ áp môi trường, khóa công trình.
+    return _join([lock, _EXTERIOR_BUILDING_LOCK, context, weather, light, veg, user, QUALITY_SUFFIX])
 
 
 # ---------------------------------------------------------------------------
