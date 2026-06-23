@@ -179,14 +179,23 @@ def describe_style(
     """
     client = _get_client()
     parts = [_to_part(image_bytes, image_mime), prompts.STYLE_DESCRIPTION_PROMPT]
-    try:
-        response = client.models.generate_content(
-            model=config.model_id(model_key),
-            contents=parts,
-        )
-    except Exception as exc:
-        raise GeminiError(f"Lỗi mô tả style tham chiếu: {exc}") from exc
-    return (getattr(response, "text", None) or "").strip()
+    # Yêu cầu TEXT output rõ ràng — image model có thể trả về ảnh thay vì text nếu
+    # không chỉ định, làm response.text = None và bỏ qua style sync.
+    for cfg in (
+        types.GenerateContentConfig(response_modalities=["TEXT"]),
+        None,
+    ):
+        try:
+            kwargs: dict = {"model": config.model_id(model_key), "contents": parts}
+            if cfg is not None:
+                kwargs["config"] = cfg
+            response = client.models.generate_content(**kwargs)
+            text = (getattr(response, "text", None) or "").strip()
+            if text:
+                return text
+        except Exception:
+            continue
+    return ""
 
 
 def render(
