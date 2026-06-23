@@ -386,17 +386,32 @@
 
     const setPos = (clientX) => {
       const r   = wrap.getBoundingClientRect();
-      const pct = Math.max(5, Math.min(95, (clientX - r.left) / r.width * 100));
-      div.style.left     = pct + '%';
+      const pct = Math.max(0, Math.min(100, (clientX - r.left) / r.width * 100));
+      div.style.left      = pct + '%';
       over.style.clipPath = `inset(0 ${(100 - pct).toFixed(1)}% 0 0)`;
     };
 
-    div.addEventListener('mousedown',  (e) => { drag = true; e.preventDefault(); });
-    wrap.addEventListener('mousemove', (e) => { if (drag) setPos(e.clientX); });
-    document.addEventListener('mouseup',  () => { drag = false; });
-    div.addEventListener('touchstart',  (e) => { drag = true; e.preventDefault(); });
-    wrap.addEventListener('touchmove',  (e) => { if (drag) { setPos(e.touches[0].clientX); e.preventDefault(); } });
-    document.addEventListener('touchend', () => { drag = false; });
+    // Ngăn native image-drag (nguyên nhân chính khiến thanh trượt giật/khó kéo).
+    [over, $('cmpBefore')].forEach((img) => { if (img) img.draggable = false; });
+    wrap.style.touchAction = 'none';   // không cuộn/zoom khi kéo (mobile/trackpad)
+    wrap.style.cursor = 'ew-resize';   // báo hiệu kéo được ở bất kỳ đâu trên ảnh
+
+    // Pointer Events + setPointerCapture: mọi chuyển động (kể cả khi con trỏ ra NGOÀI
+    // ảnh) đều route về wrap → kéo mượt liền mạch, không đứt quãng.
+    wrap.addEventListener('pointerdown', (e) => {
+      drag = true;
+      try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+      setPos(e.clientX);          // bấm đâu nhảy tới đó, rồi kéo tiếp
+      e.preventDefault();
+    });
+    wrap.addEventListener('pointermove', (e) => { if (drag) setPos(e.clientX); });
+    const stop = (e) => {
+      if (!drag) return;
+      drag = false;
+      try { wrap.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    wrap.addEventListener('pointerup', stop);
+    wrap.addEventListener('pointercancel', stop);
   }
 
   // ══════════════════════════════════════════════
