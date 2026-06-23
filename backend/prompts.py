@@ -1008,6 +1008,31 @@ REFERENCE_INSTRUCTION = (
 
 
 # ---------------------------------------------------------------------------
+# ĐỒNG BỘ STYLE BẰNG VĂN BẢN (chống reference dominance triệt để)
+# Thay vì gửi ẢNH reference (Gemini hay copy bố cục cam1 -> sai góc), ta trích mô tả
+# vật liệu/ánh sáng của cam1 thành TEXT rồi tiêm vào prompt cam2. Text không làm lệch
+# hình học -> cam2 đúng góc, chỉ mượn style.
+# ---------------------------------------------------------------------------
+STYLE_DESCRIPTION_PROMPT = (
+    "You are given a finished architectural render. Describe ONLY its MATERIALS, COLOURS, "
+    "FINISHES and LIGHTING — as a concise list another artist could use to reproduce the exact "
+    "same look on a DIFFERENT camera angle of the same space. "
+    "Cover: floor material & colour; wall finishes; ceiling treatment; cabinetry / furniture "
+    "materials and colours; metal / accent finishes; and the lighting (colour temperature, key "
+    "fixtures, overall mood and time of day). "
+    "Do NOT describe the room layout, the camera angle, the composition, or which object sits where "
+    "— ONLY the look, materials and lighting. Answer in 2–4 sentences, no preamble."
+)
+
+REFERENCE_STYLE_SYNC = (
+    "STYLE SYNC — render the scene using EXACTLY the following material, colour and lighting scheme, "
+    "taken from a previously-approved render of the SAME project so that every camera angle matches. "
+    "Apply these finishes and this lighting onto THIS image's geometry; do NOT alter the geometry, "
+    "camera angle or composition to match — only adopt the materials and lighting described here:"
+)
+
+
+# ---------------------------------------------------------------------------
 # PRESETS PAYLOAD — dữ liệu cho frontend dropdowns + placeholder hints
 # ---------------------------------------------------------------------------
 def presets_payload() -> dict:

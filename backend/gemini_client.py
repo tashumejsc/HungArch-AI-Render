@@ -166,6 +166,29 @@ def _generate(model_key: str, parts: list, aspect_ratio: str, resolution: str):
         raise GeminiError(f"Lỗi khi gọi Gemini: {exc}") from exc
 
 
+def describe_style(
+    image_bytes: bytes,
+    image_mime: str = "image/png",
+    model_key: str = config.DEFAULT_MODEL_KEY,
+) -> str:
+    """Trích mô tả VẬT LIỆU + ÁNH SÁNG của 1 ảnh render (text-only, rẻ).
+
+    Dùng để đồng bộ style sang góc camera khác bằng VĂN BẢN thay vì gửi ảnh reference
+    (chống reference dominance — xem render()). Trả về chuỗi mô tả ngắn; caller bọc
+    try/except nên nếu lỗi thì render vẫn chạy (bỏ qua đồng bộ style).
+    """
+    client = _get_client()
+    parts = [_to_part(image_bytes, image_mime), prompts.STYLE_DESCRIPTION_PROMPT]
+    try:
+        response = client.models.generate_content(
+            model=config.model_id(model_key),
+            contents=parts,
+        )
+    except Exception as exc:
+        raise GeminiError(f"Lỗi mô tả style tham chiếu: {exc}") from exc
+    return (getattr(response, "text", None) or "").strip()
+
+
 def render(
     *,
     mode: str,
@@ -181,27 +204,19 @@ def render(
     """Biến ảnh khối SketchUp thành ảnh render photorealistic."""
     aspect = _aspect_from_bytes(image_bytes)
 
+    # ĐỒNG BỘ STYLE BẰNG VĂN BẢN (chống reference dominance triệt để):
+    # KHÔNG gửi ảnh reference (Gemini hay copy bố cục cam1 → trả về sai góc). Thay vào
+    # đó trích mô tả vật liệu/ánh sáng của reference thành TEXT rồi tiêm vào prompt —
+    # text không làm lệch hình học nên ảnh input (cam2) giữ đúng góc, chỉ mượn style.
+    full_prompt = prompt_text
     if reference_bytes:
-        # Gắn NHÃN TEXT trước MỖI ảnh để Gemini không nhầm vai trò + HẠ PHÂN GIẢI
-        # reference để Gemini không copy được bố cục của nó (chống reference dominance:
-        # nếu không, mọi góc camera bị giống ảnh reference).
-        ref_small = _downscale_reference(reference_bytes)
-        full_prompt = f"{prompt_text}\n\n{prompts.REFERENCE_INSTRUCTION}"
-        parts: list = [
-            "IMAGE 1 below is the PRIMARY INPUT — the SketchUp model. You MUST reproduce its "
-            "exact camera angle, geometry, spatial layout and composition in your render:",
-            _to_part(image_bytes, image_mime),
-            "IMAGE 2 below is a STYLE REFERENCE ONLY, and it is intentionally LOW-RESOLUTION / "
-            "blurry — read ONLY its overall colours, material tones and lighting mood from it. "
-            "It carries NO usable geometry: DO NOT copy its camera angle, layout, shapes, "
-            "furniture, objects, screen/signage content, text or composition — take ALL geometry "
-            "and the camera from IMAGE 1:",
-            _to_part(ref_small, "image/png"),
-            full_prompt,
-        ]
-    else:
-        full_prompt = prompt_text
-        parts = [_to_part(image_bytes, image_mime), full_prompt]
+        try:
+            style_text = describe_style(reference_bytes, reference_mime, model_key=model_key)
+        except Exception:
+            style_text = ""
+        if style_text:
+            full_prompt = f"{prompt_text}\n\n{prompts.REFERENCE_STYLE_SYNC} {style_text}"
+    parts = [_to_part(image_bytes, image_mime), full_prompt]
 
     response = _generate(model_key, parts, aspect, resolution)
     img = _extract_image(response)
