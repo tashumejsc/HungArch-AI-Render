@@ -797,9 +797,10 @@ DRAWING_TO_2D_FLOOR_PLAN = (
     "and interior design studios, where the entire unit is modelled and furnished in 3D "
     "and then photographed from a high top-down camera (see CAMERA SETUP). "
     "READ the floor plan: solid lines = walls; arcs = door swings; gaps in walls = windows; "
-    "rectangles/icons = furniture and fixtures — preserve every room boundary, every wall "
-    "position, every door/window opening exactly where drawn, and the overall proportions "
-    "and scale of the unit. "
+    "rectangles/icons = furniture and fixtures; any room-name text already printed on the "
+    "drawing (e.g. \"P.NGỦ\", \"PHÒNG KHÁCH\", \"WC\", \"BẾP\") tells you that room's function — "
+    "preserve every room boundary, every wall position, every door/window opening exactly "
+    "where drawn, and the overall proportions and scale of the unit. "
     "BUILD a complete, fully realised 3D interior scene from this layout: "
     "walls are real 3D walls, trimmed down to a low parapet height (roughly 300–500mm tall) "
     "so the camera can see directly into every room from above — walls read as a clean dark "
@@ -826,31 +827,60 @@ DRAWING_TO_2D_FLOOR_PLAN = (
 
 DRAWING_TO_2D_SITE_PLAN = (
     "This is a 2D architectural SITE PLAN or LANDSCAPE LAYOUT (mặt bằng tổng thể / quy hoạch / "
-    "cảnh quan) line drawing. "
+    "cảnh quan) line drawing, which may also show the interior room layout of the building "
+    "inside the plot. "
     "TASK: Transform this flat 2D site plan into a fully realised, photorealistic top-view "
     "3D site/landscape render — built as a complete 3D scene (buildings, paving, planting, "
     "water features) and photographed from a high top-down camera (see CAMERA SETUP). "
-    "READ the site plan: building outlines, boundary lines, road/path centrelines and widths, "
-    "tree/shrub symbols, water bodies and parking layout — preserve every footprint, boundary, "
-    "and plotted element exactly where drawn, at the same scale and proportion. "
+    "READ the site plan: the plot boundary line (often a dashed or coloured outline), building "
+    "outlines, room layout inside the building, road/path centrelines and widths, tree/shrub "
+    "symbols, water bodies and parking layout; any room-name or area-name text already printed "
+    "on the drawing (e.g. \"SÂN TRƯỚC\", \"PHÒNG KHÁCH\", \"BẾP\", \"SÂN SAU\") tells you that "
+    "area's function — preserve every footprint, every boundary line, and every plotted "
+    "element exactly where drawn, at the same scale and proportion. "
     "BUILD a complete 3D landscape scene from this layout: "
-    "building footprints become real roof volumes with a realistic roof material (tile, "
-    "membrane, or flat roof finish as architecturally appropriate) and a small amount of "
-    "real building height/massing visible at this camera angle, not a flat colour patch; "
-    "tree and shrub symbols become real 3D canopy forms viewed from above — full, layered, "
-    "photorealistic foliage with natural colour variation by species/size, casting soft "
-    "natural shadow onto the ground beneath; "
-    "lawn and planting beds become real grass/groundcover texture; "
-    "roads, driveways and footpaths become realistic paved surfaces with visible material "
-    "texture (asphalt, paver joints, or concrete as appropriate) and soft ambient shading; "
+    "the building itself follows the same 'Top-View 3D Floor Plan' treatment as a fully "
+    "furnished interior (low parapet walls ~300–500mm so rooms are visible from above, "
+    "realistic floor materials per room, real 3D furniture appropriate to each room's "
+    "function); "
+    "OUTSIDE the building footprint, fill the plot with a rich, realistic landscape: "
+    "real 3D canopy trees scattered generously along the plot boundary and in garden corners "
+    "(varied size and species, layered photorealistic foliage viewed from above, casting soft "
+    "natural shadow), lawn/grass areas as real turf texture, gravel or pebble-paved zones "
+    "(sân rải sỏi) as a realistic loose-stone texture, paved courtyards/driveways as real "
+    "concrete or paver-tile texture with visible joints, small ornamental garden beds "
+    "(tiểu cảnh) with planting and stone accents; "
     "water bodies (pools, ponds, fountains) become real water material with natural "
     "reflections, subtle ripples and depth, not a flat colour fill; "
-    "parking areas show real paving with visible bay markings. "
+    "parking areas show real paving with visible bay markings or parked car models if drawn. "
     "LIGHTING: soft, natural daylight from one consistent high sun angle, casting soft, "
     "naturally-blurred shadows from buildings and trees with realistic falloff and length — "
     "physically believable outdoor daylight shadows, not flat graphic silhouettes. "
-    "Output: a warm, photorealistic, fully-realised top-view 3D site/landscape render, "
-    "at the exact same layout, proportions and arrangement as the input plan."
+    "Output: a warm, photorealistic, fully-realised top-view 3D site/landscape render with a "
+    "lushly landscaped plot, at the exact same layout, proportions and arrangement as the "
+    "input plan."
+)
+
+# ---------------------------------------------------------------------------
+# NHÃN TÊN PHÒNG ĐÈ LÊN ẢNH — dùng chung cho cả floor_plan và site_plan.
+# Tham chiếu mẫu chuẩn: layout kiểu DIMOR/Phương Nam House, chữ in hoa đặt giữa từng
+# phòng, đè trực tiếp lên mặt sàn render, không phải callout/box kéo ra ngoài.
+# ---------------------------------------------------------------------------
+_ROOM_LABEL_OVERLAY = (
+    "ROOM LABELS — add a short room-name label printed directly on top of the floor surface "
+    "inside each room/area, centred in that space, the way professional floor-plan "
+    "presentation boards do (e.g. DIMOR-style or real-estate marketing floor plans): "
+    "clean, legible, all-caps or title-case sans-serif text, small enough not to overwhelm "
+    "the room, in a neutral dark or white colour with enough contrast against the floor "
+    "material beneath it (add a very subtle text shadow or soft backing tint only if needed "
+    "for legibility). "
+    "If the original drawing already has room-name text or numbered legend callouts, use "
+    "those exact names/numbers (translate handwriting into clean typography, do not invent "
+    "different room names). If a room has no label in the original drawing, infer a sensible "
+    "Vietnamese architectural room name from its furniture and size (e.g. \"PHÒNG NGỦ\", "
+    "\"PHÒNG KHÁCH\", \"BẾP\", \"WC\", \"SÂN TRƯỚC\", \"SÂN SAU\") and label it consistently. "
+    "Every distinct room or outdoor area must have exactly one label — do not duplicate "
+    "labels, do not add dimension numbers, do not add furniture callouts beyond the room name."
 )
 
 # ---------------------------------------------------------------------------
@@ -858,6 +888,8 @@ DRAWING_TO_2D_SITE_PLAN = (
 # 3D thật, khác hẳn QUALITY_SUFFIX gốc (vốn nói về ảnh phối cảnh góc thấp/eye-level).
 # Không dùng ngôn ngữ "flat/vector-like/orthographic" — ngược lại, nhấn mạnh chiều sâu,
 # vật liệu thật, ánh sáng mềm tự nhiên — đúng tinh thần render final trong giáo trình V-Ray.
+# LƯU Ý: KHÔNG cấm text/room-label ở đây nữa — _ROOM_LABEL_OVERLAY chịu trách nhiệm riêng
+# cho phần chữ; suffix này chỉ cấm watermark/dimension number/border kỹ thuật không mong muốn.
 # ---------------------------------------------------------------------------
 QUALITY_SUFFIX_2D = (
     "Output must read as a genuine high-end CGI photograph taken from above — full "
@@ -867,9 +899,10 @@ QUALITY_SUFFIX_2D = (
     "expected, the way a real high-vantage-point photo would render. "
     "Professional real-estate / interior-design 'Top-View 3D Floor Plan' presentation "
     "quality — warm, inviting, magazine-ready. "
-    "No text labels added, no dimension numbers added, no watermark, no border, no people, "
-    "no flat 2D schematic elements of any kind — every element must look like a real "
-    "physical object photographed in 3D space."
+    "No dimension numbers, no watermark, no decorative page border, no company logo, "
+    "no people — every physical element (walls, floors, furniture, landscaping) must look "
+    "like a real object photographed in 3D space; room-name labels described above are the "
+    "only text allowed in the image."
 )
 
 
@@ -917,7 +950,7 @@ def build_drawing_prompt(
         # trực tiếp 'floor_plan'/'site_plan'.
         is_site_plan = drawing_output in ("exterior", "site_plan")
         base = DRAWING_TO_2D_SITE_PLAN if is_site_plan else DRAWING_TO_2D_FLOOR_PLAN
-        return _join([base, dtype_hint, _TOPVIEW_3D_CAMERA, user, QUALITY_SUFFIX_2D])
+        return _join([base, dtype_hint, _TOPVIEW_3D_CAMERA, _ROOM_LABEL_OVERLAY, user, QUALITY_SUFFIX_2D])
 
 
 def build_text_edit_prompt(instruction: str) -> str:
