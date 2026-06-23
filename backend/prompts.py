@@ -1021,25 +1021,29 @@ REFERENCE_INSTRUCTION = (
 # hình học -> cam2 đúng góc, chỉ mượn style.
 # ---------------------------------------------------------------------------
 STYLE_DESCRIPTION_PROMPT = (
-    "You are given a finished architectural render. Describe ONLY its MATERIALS, COLOURS, "
-    "FINISHES and LIGHTING — as a concise list another artist could use to reproduce the exact "
-    "same look on a DIFFERENT camera angle of the same space. "
-    "Cover: floor material & colour; wall finishes & paint colour; ceiling treatment; "
-    "cabinetry / furniture material type and colour; metal / accent finishes; and the lighting "
-    "(colour temperature, fixture types, overall mood and time of day). "
-    "CRITICAL — do NOT mention ANY positional or spatial information: do NOT write 'on the left', "
-    "'on the right', 'in the centre', 'facing the window', 'at the far end', 'viewed from', "
-    "'in front of', 'behind', or any phrase that describes where something IS in the room or "
-    "how the camera is oriented. Describe ONLY what the surface LOOKS LIKE up close: "
-    "its material, colour and finish — nothing about its location or the camera viewpoint. "
-    "Answer in 2–4 sentences, no preamble, zero spatial references."
+    "Analyze this architectural render and extract a reusable SURFACE MATERIAL PALETTE. "
+    "Return EXACTLY 5 lines in this format — nothing else:\n"
+    "FLOOR: [material name] — [color/tone] — [finish]\n"
+    "WALLS: [surface material] — [color/tone] — [finish/texture]\n"
+    "CEILING: [material] — [color] — [any cove/LED note]\n"
+    "PALETTE: [3 dominant color names, comma separated]\n"
+    "LIGHTING: [color temperature e.g. 3000K] — [warm/cool/neutral] — [day/evening/night]\n\n"
+    "ABSOLUTE RULES — any violation makes the output useless:\n"
+    "• Write ONLY about bare surfaces (floor, wall, ceiling). Do NOT name or describe any "
+    "specific object, furniture piece, equipment, artwork, logo, screen, fixture, or décor item\n"
+    "• Use ZERO positional words: no left, right, centre, front, back, facing, beside, above, "
+    "below, corner, behind, in front, near, far, or any direction word\n"
+    "• Describe what the surface material LOOKS LIKE as a material — NOT what you see in the scene\n"
+    "• Each line must be under 15 words\n"
+    "Output only the 5 lines, no preamble, no extra text."
 )
 
 REFERENCE_STYLE_SYNC = (
-    "STYLE SYNC — render the scene using EXACTLY the following material, colour and lighting scheme, "
-    "taken from a previously-approved render of the SAME project so that every camera angle matches. "
-    "Apply these finishes and this lighting onto THIS image's geometry; do NOT alter the geometry, "
-    "camera angle or composition to match — only adopt the materials and lighting described here:"
+    "SURFACE STYLE PALETTE — apply ONLY these surface materials, colours and lighting onto "
+    "THIS render. The camera angle, viewpoint, composition and ALL geometry come EXCLUSIVELY "
+    "from the attached SketchUp input image — do NOT change or adjust the camera or geometry "
+    "for any reason. This palette is for material and lighting consistency only across "
+    "different camera angles of the same project:"
 )
 
 

@@ -179,9 +179,11 @@ def describe_style(
     """
     client = _get_client()
     parts = [_to_part(image_bytes, image_mime), prompts.STYLE_DESCRIPTION_PROMPT]
-    # Yêu cầu TEXT output rõ ràng — image model có thể trả về ảnh thay vì text nếu
-    # không chỉ định, làm response.text = None và bỏ qua style sync.
+    # Ép TEXT output — dùng response_mime_type (cùng pattern với analyze_mood, đã
+    # chứng minh hoạt động với image model). response_modalities=["TEXT"] hay None
+    # có thể khiến model trả về ảnh → response.text = None → style sync bị bỏ qua.
     for cfg in (
+        types.GenerateContentConfig(response_mime_type="text/plain"),
         types.GenerateContentConfig(response_modalities=["TEXT"]),
         None,
     ):
