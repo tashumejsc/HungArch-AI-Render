@@ -264,7 +264,14 @@ def render(
         except Exception:
             style_text = ""
         if style_text:
-            full_prompt = f"{prompt_text}\n\n{prompts.REFERENCE_STYLE_SYNC} {style_text}"
+            # CAMERA_ANCHOR lặp lại SAU style text (vị trí recency mạnh nhất) để override
+            # mọi bias bố cục ngầm từ palette. Đầu prompt đã có CAMERA_ANCHOR (qua
+            # build_*_prompt(use_reference_style=True)) → sandwich: đầu + cuối kẹp cứng.
+            full_prompt = (
+                f"{prompt_text}\n\n"
+                f"{prompts.REFERENCE_STYLE_SYNC} {style_text}\n\n"
+                f"{prompts.CAMERA_ANCHOR}"
+            )
     parts = [_to_part(image_bytes, image_mime), full_prompt]
 
     response = _generate(model_key, parts, aspect, resolution)

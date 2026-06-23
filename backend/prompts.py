@@ -785,8 +785,11 @@ def build_interior_prompt(
     user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
 
     if use_reference_style:
+        # CAMERA_ANCHOR đầu: frame nhiệm vụ "góc camera KHÁC reference".
         # Không có style/lighting preset — style đến 100% từ cam1 extracted palette.
-        return _join([lock, _INTERIOR_STYLE_CLAMP, user, QUALITY_SUFFIX, _LIGHTING_FIXTURE_CLAMP])
+        # CAMERA_ANCHOR cũng được nối SAU style text trong gemini_client.render() → sandwich.
+        return _join([CAMERA_ANCHOR, lock, _INTERIOR_STYLE_CLAMP, user, QUALITY_SUFFIX,
+                      _LIGHTING_FIXTURE_CLAMP])
 
     if input_type == "textured":
         style_prompt = INTERIOR_STYLES.get(style_key, {}).get("prompt", "")
@@ -827,7 +830,8 @@ def build_exterior_prompt(
     user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
 
     if use_reference_style:
-        return _join([lock, _EXTERIOR_BUILDING_LOCK, user, QUALITY_SUFFIX])
+        # CAMERA_ANCHOR đầu: frame nhiệm vụ "góc camera KHÁC reference".
+        return _join([CAMERA_ANCHOR, lock, _EXTERIOR_BUILDING_LOCK, user, QUALITY_SUFFIX])
 
     if input_type == "textured":
         ctx_prompt = EXTERIOR_CONTEXTS.get(context_key, {}).get("prompt", "")
@@ -1080,6 +1084,21 @@ REFERENCE_STYLE_SYNC = (
     "from the attached SketchUp input image — do NOT change or adjust the camera or geometry "
     "for any reason. This palette is for material and lighting consistency only across "
     "different camera angles of the same project:"
+)
+
+# Đặt ĐẦU prompt khi use_reference_style=True (frame nhiệm vụ) VÀ SAU style text trong
+# gemini_client.render() (vị trí recency mạnh nhất) → sandwich triệt tiêu 100% bias bố
+# cục từ palette text. Palette atomic đã lọc rồi nhưng Gemini vẫn có thể suy luận ngầm
+# (vd "dark walnut + conference chairs" → frontal composition) → cần override explicit.
+CAMERA_ANCHOR = (
+    "VIEWPOINT ANCHOR — CRITICAL: this render uses a COMPLETELY DIFFERENT camera position "
+    "and viewing angle than the reference render. The ONLY valid camera angle, eye position, "
+    "field of view, and view direction is the one shown in the SketchUp input image attached "
+    "to this request — reproduce it exactly and exclusively. Do NOT adjust, drift, or borrow "
+    "any composition, layout, or spatial arrangement from the surface palette text or any "
+    "reference render. The style palette above describes surface MATERIALS and LIGHTING COLOUR "
+    "ONLY — it carries zero information about camera position, viewpoint, or scene composition. "
+    "Camera position = SketchUp input. Materials = palette above. These are separate."
 )
 
 
