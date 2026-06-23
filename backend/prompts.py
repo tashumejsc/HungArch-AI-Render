@@ -724,6 +724,21 @@ def _join(parts: list[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# ĐỒNG BỘ ĐÈN CHO RENDER ĐA GÓC — mỗi góc là 1 lần gọi Gemini độc lập nên hệ đèn
+# hay khác nhau (góc thì đèn thả, góc thì cove). Ép đèn ĐƠN GIẢN & THỐNG NHẤT để 3
+# góc nhìn như cùng một công trình.
+# ---------------------------------------------------------------------------
+_MULTI_ANGLE_LIGHTING = (
+    "MULTI-ANGLE CONSISTENCY — this render is one of a set showing the SAME room from different "
+    "camera angles, so the lighting scheme MUST be simple and identical across every angle: use ONLY "
+    "recessed ceiling downlights plus at most one continuous cove LED line. DO NOT add decorative "
+    "pendant lights, chandeliers, hanging lamps or ceiling-mounted AC cassette units. Keep the same "
+    "wall, floor and ceiling materials and the same warm lighting tone as the style reference, so all "
+    "angles read as one consistent project."
+)
+
+
+# ---------------------------------------------------------------------------
 # GEMINI PROMPT BUILDERS
 # Gemini = instruction-following model → cần GEOMETRY_LOCK + mô tả chi tiết
 # ---------------------------------------------------------------------------
@@ -732,6 +747,7 @@ def build_interior_prompt(
     user_text: str = "",
     lighting_key: str = "golden_hour",
     input_type: str = "wireframe",
+    multi_angle: bool = False,
 ) -> str:
     """Xây prompt nội thất.
 
@@ -752,8 +768,9 @@ def build_interior_prompt(
 
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("interior", "")
     user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
+    ma = _MULTI_ANGLE_LIGHTING if multi_angle else ""
     # _INTERIOR_STYLE_CLAMP ngay sau style để kẹp lại: style chỉ là palette, không thêm đồ.
-    return _join([lock, style, _INTERIOR_STYLE_CLAMP, light, user, QUALITY_SUFFIX])
+    return _join([lock, style, _INTERIOR_STYLE_CLAMP, light, ma, user, QUALITY_SUFFIX])
 
 
 def build_exterior_prompt(
@@ -763,6 +780,7 @@ def build_exterior_prompt(
     lighting_key: str = "golden_hour",
     vegetation_key: str = "moderate",
     input_type: str = "wireframe",
+    multi_angle: bool = False,
 ) -> str:
     """Xây prompt ngoại thất.
 
@@ -785,8 +803,9 @@ def build_exterior_prompt(
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("exterior", "")
     veg = VEGETATION_DENSITY.get(vegetation_key, {}).get("prompt", "")
     user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
+    ma = _MULTI_ANGLE_LIGHTING if multi_angle else ""
     # _EXTERIOR_BUILDING_LOCK đứng ngay sau lock: bối cảnh chỉ áp môi trường, khóa công trình.
-    return _join([lock, _EXTERIOR_BUILDING_LOCK, context, weather, light, veg, user, QUALITY_SUFFIX])
+    return _join([lock, _EXTERIOR_BUILDING_LOCK, context, weather, light, veg, ma, user, QUALITY_SUFFIX])
 
 
 # ---------------------------------------------------------------------------

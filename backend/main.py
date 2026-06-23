@@ -191,6 +191,7 @@ async def api_render(
     seed: str = Form(""),
     lighting: str = Form("golden_hour"),
     vegetation: str = Form("moderate"),
+    multi_angle: bool = Form(False),                   # True = 1 ảnh trong bộ render đa góc
     reference_image: UploadFile | None = File(None),
 ):
     _require_license()
@@ -200,11 +201,12 @@ async def api_render(
 
     if mode == "interior":
         prompt_text = prompts.build_interior_prompt(
-            style, prompt, lighting, input_type=input_type
+            style, prompt, lighting, input_type=input_type, multi_angle=multi_angle
         )
     elif mode == "exterior":
         prompt_text = prompts.build_exterior_prompt(
-            context, weather, prompt, lighting, vegetation, input_type=input_type
+            context, weather, prompt, lighting, vegetation, input_type=input_type,
+            multi_angle=multi_angle,
         )
     elif mode == "drawing":
         prompt_text = prompts.build_drawing_prompt(

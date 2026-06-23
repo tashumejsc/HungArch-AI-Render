@@ -895,6 +895,7 @@
     fd.append('lighting',   $('lightingSelect').value);
     fd.append('vegetation', $('vegetationSelect').value);
     fd.append('input_type', currentInputType);
+    fd.append('multi_angle', 'true');   // đồng bộ đèn đơn giản giữa các góc
     if (referenceBlob) fd.append('reference_image', referenceBlob, 'styleref.png');
     if (currentTab === 'interior') {
       fd.append('style',   $('styleSelect').value);

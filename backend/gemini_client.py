@@ -59,7 +59,7 @@ def _aspect_from_bytes(image_bytes: bytes) -> str:
         return "1:1"
 
 
-def _downscale_reference(reference_bytes: bytes, max_side: int = 384) -> bytes:
+def _downscale_reference(reference_bytes: bytes, max_side: int = 512) -> bytes:
     """Hạ độ phân giải ảnh reference để CHỐNG 'reference dominance'.
 
     Khi reference là ảnh render sắc nét, Gemini hay copy luôn bố cục/góc của nó thay
