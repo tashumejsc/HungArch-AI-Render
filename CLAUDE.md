@@ -32,11 +32,11 @@ Browser (frontend/) → FastAPI (backend/main.py) → gemini_client.py → store
 
 | File | Role |
 |---|---|
-| `main.py` | FastAPI app; **10 routes**: `GET /api/presets`, `POST /api/config`, `GET /api/license`, `POST /api/license/activate`, `POST /api/pdf-preview`, `POST /api/render-pdf-page`, `POST /api/render`, `POST /api/inpaint`, `POST /api/analyze-mood`, `POST /api/enhance`. Image-generating routes call `_require_license()` first. 2D-render (`drawing_mode == "2d_render"`) returns Gemini's raw output with **no** image post-processing (all overlay / geometry-lock experiments were reverted to the V1.0.0 approach). |
+| `main.py` | FastAPI app; **10 routes**: `GET /api/presets`, `POST /api/config`, `GET /api/license`, `POST /api/license/activate`, `POST /api/pdf-preview`, `POST /api/render-pdf-page`, `POST /api/render`, `POST /api/inpaint`, `POST /api/analyze-mood`, `POST /api/enhance`. Image-generating routes call `_require_license()` first. `/api/render` takes a `multi_angle` Form flag (→ consistent multi-angle lighting). 2D-render (`drawing_mode == "2d_render"`) returns Gemini's raw output with **no** image post-processing (all overlay / geometry-lock experiments were reverted to the V1.0.0 approach). |
 | `config.py` | Loads `.env`, exposes API keys and model IDs. `set_keys()` updates runtime state AND rewrites `.env` (called from `/api/config`). Client rebuilds lazily when key changes. Models: `flash` = `gemini-3.1-flash-image`, `pro` = `gemini-3-pro-image`. **Do not add `gemini-2.5-*-preview` — those are chat models and return 404 for IMAGE modality.** |
 | `prompts.py` | **Single source of truth for all presets and prompt logic.** Key functions: `build_interior_prompt()`, `build_exterior_prompt()`, `build_drawing_prompt()` (dispatches to interior/exterior 3D or 2D render path), `build_inpaint_prompt()` (mask-based), `build_text_edit_prompt()` (text-only, no mask), `build_mood_analysis_prompt()` (colour-grading suggestion). `presets_payload()` drives all frontend dropdowns incl. `mood_presets`. `REFERENCE_INSTRUCTION` enforces strict separation between the two render images (see Reference-image style sync below). |
 | `store.py` | Saves `outputs/<token>.png` + `outputs/<token>.json` (metadata). `seed = token = filename` — no separate display_seed. |
-| `gemini_client.py` | Wraps `google-genai` SDK. Four operations: `render()` (SketchUp → photorealistic, optional reference image), `enhance()` (quality upscale), `inpaint()` (local edit — mask OR text-only), `analyze_mood()` (text-only JSON response — no image modality). `_build_config()` constructs `GenerateContentConfig` defensively (tries full → partial → empty to survive SDK changes). **`render()` with a reference image interleaves a labelling text part BEFORE each image** (`"IMAGE 1 … PRIMARY INPUT"` / `"IMAGE 2 … STYLE REFERENCE ONLY"`) so Gemini does not copy the reference's geometry. |
+| `gemini_client.py` | Wraps `google-genai` SDK. Four operations: `render()` (SketchUp → photorealistic, optional reference image), `enhance()` (quality upscale), `inpaint()` (local edit — mask OR text-only), `analyze_mood()` (text-only JSON response — no image modality). `_build_config()` constructs `GenerateContentConfig` defensively (tries full → partial → empty to survive SDK changes). **`render()` with a reference image interleaves a labelling text part BEFORE each image** (`"IMAGE 1 … PRIMARY INPUT"` / `"IMAGE 2 … STYLE REFERENCE ONLY"`) AND **`_downscale_reference()` shrinks the reference to ≤512px** so Gemini reads only its colour/material/mood, not its geometry (see Reference-image style sync). |
 | `pdf_utils.py` | Splits an uploaded PDF into per-page PNGs + thumbnails for the multi-page 2D render flow. |
 | `license.py` | 30-day trial + offline ECDSA key activation. `get_status()` / `activate()`. |
 
@@ -137,8 +137,9 @@ The current `2d_render` is the original simple prompt: `build_drawing_prompt()` 
 
 ### Reference-image style sync (Đồng bộ Style)
 
-Bug class: when a polished render is passed as `reference_image`, Gemini gravitates to the **more photorealistic** image and copies its geometry/objects, ignoring the (greyscale, less detailed) SketchUp input. Fix has two parts and **must stay together**:
+Bug class: when a polished render is passed as `reference_image`, Gemini gravitates to the **more photorealistic** image and copies its geometry/objects, ignoring the (greyscale, less detailed) SketchUp input. Fix has **three** parts and **must stay together**:
 - `gemini_client.render()` interleaves a **text label before each image** in `contents` (`IMAGE 1 = PRIMARY INPUT` / `IMAGE 2 = STYLE REFERENCE ONLY`).
+- **`_downscale_reference()` shrinks the reference to ≤512px before sending** — the decisive fix. A low-res reference still conveys colour/material/lighting mood but loses the fine geometry detail Gemini was copying, so Gemini must take geometry from IMAGE 1. Trade-off: material match is by tone/type, not pixel-exact (the `max_side` knob trades style-tightness vs angle-independence; 512 is the tuned value — lower → angles more independent, higher → reference dominance returns).
 - `REFERENCE_INSTRUCTION` takes ALL geometry/camera/layout from image 1, ONLY colour/material/mood from image 2, with an explicit prohibition on copying the reference's objects, screens, text, composition.
 
 ### Đa góc nhìn — multi-angle render (B)
@@ -150,6 +151,8 @@ Lets one room/building render at 2–3 different SketchUp camera angles with **c
 
 UI: `#tab-interior` / `#tab-exterior` each have a "📸 Góc nhìn bổ sung" block with 2 `.dropzone-mini` zones → `files.{interior,exterior}Angle2/3`. `_extraAngleFiles()` reads them; `updateRenderBtnLabel()` shows "📸 Render N góc đồng bộ". `doRender()` routes to `doRenderMulti()` when ≥1 extra angle is present. **Each angle is an independent Gemini call**, so exact material micro-detail (e.g. marble veining) won't match pixel-for-pixel across angles — only material type / tone / mood.
 
+**Lighting consistency (`multi_angle` flag):** because each angle is independent and clay models have no fixtures, each angle would otherwise invent its own lighting (one gets pendants, another cove). `_buildAngleFD()` sends `multi_angle=true` → `/api/render` passes it to `build_interior_prompt()`/`build_exterior_prompt()` → they append `_MULTI_ANGLE_LIGHTING` (only downlights + one cove LED; NO decorative pendants/chandeliers/AC cassettes) so all angles share one simple, identical lighting scheme. The flag defaults `False`, so single renders are unaffected.
+
 ### PDF multi-page render (drawing tab)
 
 Uploading a **PDF** to the drawing dropzone triggers `uploadPdfForPreview()` → `POST /api/pdf-preview` (`pdf_utils.split_pdf_pages` → per-page PNGs saved as `outputs/_pdfpage_<token>.png` + thumbnails). Selected pages live in `pdfPages[]` (state). `doRender()` routes to `doRenderPdfPages()` when `isPdfMode`, which renders each selected page via `POST /api/render-pdf-page` (by `page_token`). `updateRenderBtnLabel()` shows "⚡ Render N trang đã chọn".
@@ -158,7 +161,16 @@ Uploading a **PDF** to the drawing dropzone triggers `uploadPdfForPreview()` →
 
 ### Key Design Decisions
 
-**GEOMETRY_LOCK in prompts:** Gemini needs explicit instruction to preserve SketchUp geometry. Always included in `build_interior_prompt()` and `build_exterior_prompt()`. The drawing prompts have their own equivalent geometry-lock wording.
+**GEOMETRY_LOCK in prompts (the full lock set):** Gemini is generative — only prompting (no ControlNet) keeps geometry, so `GEOMETRY_LOCK` (wireframe/clay input) and `GEOMETRY_LOCK_TEXTURED` (already-textured input) pack **layered, named locks**, each added because a real test showed that specific drift:
+- camera / walls / ceiling / floor / room proportions;
+- **FURNITURE IDENTITY LOCK** — keep every piece same type/size/orientation (no table→island restyle);
+- **COUNT REPEATED SEATS** — count bar stools & dining chairs exactly (diffusion miscounts small repeated objects — the most fragile);
+- **OPENINGS LOCK** — same windows/doors/openings; a solid wall stays solid (no invented windows);
+- **GLAZING LOCK** (both directions) — existing glass partitions/curtain walls/glass doors stay glass at the same frame/panels; don't add new glazing;
+- **DAYLIGHT DIRECTION** — sun/shadows only from real openings; a solid wall casts no window-shaped light;
+- **LIGHTING conditional rule** — if the model already shows fixtures → lock them (don't add); if it has none → may place standard downlights/cove (room must still be lit).
+
+Interior also appends `_INTERIOR_STYLE_CLAMP` (the style preset = a *material palette*, NOT a furniture shopping list — don't add objects/seating to "fill" empty space); exterior appends `_EXTERIOR_BUILDING_LOCK` (context/weather/vegetation apply only to the surroundings; the building itself is locked). **These are tuned by iterative testing — when a new "AI invented X" drift appears, add/extend a named lock here rather than reverting to post-processing.** The 2D drawing prompts (`DRAWING_TO_2D`) carry their own lighter layout-preservation wording.
 
 **Seed = token = filename:** `new_token()` generates `HA<timestamp><hex>` used as both the PNG filename and `RenderResult.seed`. No separate display_seed — user copies seed → finds exact file in `outputs/`.
 
