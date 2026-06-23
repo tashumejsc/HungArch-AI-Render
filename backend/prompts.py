@@ -755,14 +755,23 @@ def build_interior_prompt(
     lighting_key: str = "golden_hour",
     input_type: str = "wireframe",
     multi_angle: bool = False,
+    use_reference_style: bool = False,
 ) -> str:
     """Xây prompt nội thất.
 
     input_type='wireframe'  → ảnh đen trắng chưa có vật liệu: AI thêm hoàn toàn theo preset.
     input_type='textured'   → ảnh đã áp vật liệu trong SU: AI giữ vật liệu, chỉ nâng photorealistic.
+    use_reference_style=True → có reference image: bỏ style/lighting preset của cam này để tránh
+                               xung đột với style palette cam1 sẽ được inject bởi render().
     """
+    lock = GEOMETRY_LOCK_TEXTURED if input_type == "textured" else GEOMETRY_LOCK
+    user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
+
+    if use_reference_style:
+        # Không có style/lighting preset — style đến 100% từ cam1 extracted palette.
+        return _join([lock, _INTERIOR_STYLE_CLAMP, user, QUALITY_SUFFIX])
+
     if input_type == "textured":
-        lock = GEOMETRY_LOCK_TEXTURED
         style_prompt = INTERIOR_STYLES.get(style_key, {}).get("prompt", "")
         style = (
             f"Aesthetic enhancement direction (do not replace existing materials, only refine "
@@ -770,11 +779,9 @@ def build_interior_prompt(
             if style_prompt else ""
         )
     else:
-        lock = GEOMETRY_LOCK
         style = INTERIOR_STYLES.get(style_key, {}).get("prompt", "")
 
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("interior", "")
-    user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
     ma = _MULTI_ANGLE_LIGHTING if multi_angle else ""
     # _INTERIOR_STYLE_CLAMP ngay sau style để kẹp lại: style chỉ là palette, không thêm đồ.
     return _join([lock, style, _INTERIOR_STYLE_CLAMP, light, ma, user, QUALITY_SUFFIX])
@@ -788,14 +795,22 @@ def build_exterior_prompt(
     vegetation_key: str = "moderate",
     input_type: str = "wireframe",
     multi_angle: bool = False,
+    use_reference_style: bool = False,
 ) -> str:
     """Xây prompt ngoại thất.
 
     input_type='wireframe'  → ảnh đen trắng: AI thêm vật liệu + bối cảnh hoàn toàn theo preset.
     input_type='textured'   → ảnh đã có vật liệu: AI giữ vật liệu, chỉ nâng photorealistic.
+    use_reference_style=True → có reference image: bỏ context/weather/lighting preset để tránh
+                               xung đột với style palette cam1 sẽ được inject bởi render().
     """
+    lock = GEOMETRY_LOCK_TEXTURED if input_type == "textured" else GEOMETRY_LOCK
+    user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
+
+    if use_reference_style:
+        return _join([lock, _EXTERIOR_BUILDING_LOCK, user, QUALITY_SUFFIX])
+
     if input_type == "textured":
-        lock = GEOMETRY_LOCK_TEXTURED
         ctx_prompt = EXTERIOR_CONTEXTS.get(context_key, {}).get("prompt", "")
         context = (
             f"Contextual enhancement (enhance existing environment towards this setting without replacing "
@@ -803,13 +818,11 @@ def build_exterior_prompt(
             if ctx_prompt else ""
         )
     else:
-        lock = GEOMETRY_LOCK
         context = EXTERIOR_CONTEXTS.get(context_key, {}).get("prompt", "")
 
     weather = EXTERIOR_WEATHER.get(weather_key, {}).get("prompt", "")
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("exterior", "")
     veg = VEGETATION_DENSITY.get(vegetation_key, {}).get("prompt", "")
-    user = f"Additional user requirements: {user_text.strip()}" if user_text.strip() else ""
     ma = _MULTI_ANGLE_LIGHTING if multi_angle else ""
     # _EXTERIOR_BUILDING_LOCK đứng ngay sau lock: bối cảnh chỉ áp môi trường, khóa công trình.
     return _join([lock, _EXTERIOR_BUILDING_LOCK, context, weather, light, veg, ma, user, QUALITY_SUFFIX])

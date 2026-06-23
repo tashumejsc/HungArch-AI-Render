@@ -222,6 +222,21 @@ async def api_render(
     else:
         raise HTTPException(status_code=400, detail="mode phải là 'interior', 'exterior' hoặc 'drawing'.")
 
+    # Khi có reference image → build prompt rút gọn (bỏ style/lighting preset của cam2)
+    # để tránh xung đột với style palette của cam1 sẽ được inject bởi render().
+    has_reference = reference_image is not None
+    if has_reference and mode in ("interior", "exterior"):
+        if mode == "interior":
+            prompt_text = prompts.build_interior_prompt(
+                style, prompt, lighting, input_type=input_type,
+                multi_angle=multi_angle, use_reference_style=True,
+            )
+        else:
+            prompt_text = prompts.build_exterior_prompt(
+                context, weather, prompt, lighting, vegetation,
+                input_type=input_type, multi_angle=multi_angle, use_reference_style=True,
+            )
+
     ref_bytes, ref_mime = None, "image/png"
     if reference_image is not None:
         ref_bytes = await reference_image.read() or None
