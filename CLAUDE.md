@@ -51,6 +51,7 @@ Browser (frontend/) → FastAPI (backend/main.py) → gemini_client.py → store
 | `loadPresets()` | Fetches `/api/presets`, fills all dropdowns, calls `updateTechSummary()` |
 | `doRender()` | Submits render form; saves `originalSourceFile` / `originalRenderParams`; resets `appliedEdits = []`. Routes to `doRenderPdfPages()` (PDF mode) or `doRenderMulti()` (interior/exterior with extra angles) before the single-render path. |
 | `doRenderMulti(primaryFile, extraAngles)` | **Đa góc nhìn (multi-angle).** Renders the primary angle, then uses its output as the `reference_image` for each extra angle → style-consistent set. Pure frontend orchestration over `/api/render` (no backend route). Calls `showMultiAngleResults()`. |
+| `doRenderPdfPages()` | **PDF multi-page.** Loops the user-selected `pdfPages[]`, POSTs each `page_token` to `/api/render-pdf-page`, then `showPdfPageResults()` renders a gallery. Drawing tab only. |
 | `doInpaint()` | Mask-mode: exports canvas → POST to `/api/inpaint` with mask; pushes to `appliedEdits[]` on success |
 | `doTextEdit()` | Text-mode: POST to `/api/inpaint` without mask; shows compare view + `#editPreviewActions` |
 | `doEnhance()` | POST to `/api/enhance`; calls `showResult()` |
@@ -72,7 +73,7 @@ Browser (frontend/) → FastAPI (backend/main.py) → gemini_client.py → store
 Tabs row          3 tab-btn with .tab-dot green indicator when image uploaded
 #tab-interior     Upload + "📸 Góc nhìn bổ sung" (2 mini-dropzones) + style dropdown + prompt textarea
 #tab-exterior     Upload + "📸 Góc nhìn bổ sung" (2 mini-dropzones) + "Bối cảnh & môi trường" card (context + weather + vegetation)
-#tab-drawing      Upload + drawing type/mode/output controls with branch-flow hints
+#tab-drawing      Upload (img/PDF) + scan toggle + PDF page grid + drawing type/mode/output controls with branch-flow hints
 .input-type-card  Shared Wireframe / Đã vật liệu toggle (amber border, always visible)
 #techConfig       <details> accordion: reference image, lighting, seed, resolution, model
                   summary shows: "▶ ⚙️ Cấu hình kỹ thuật [lighting · model · res] [cost pill]"
@@ -148,6 +149,12 @@ Lets one room/building render at 2–3 different SketchUp camera angles with **c
 3. `showMultiAngleResults()` puts the primary in the main viewer (post-process enabled) and renders a 3-up gallery (`#multiAngleGallery`); clicking a thumbnail swaps the active result.
 
 UI: `#tab-interior` / `#tab-exterior` each have a "📸 Góc nhìn bổ sung" block with 2 `.dropzone-mini` zones → `files.{interior,exterior}Angle2/3`. `_extraAngleFiles()` reads them; `updateRenderBtnLabel()` shows "📸 Render N góc đồng bộ". `doRender()` routes to `doRenderMulti()` when ≥1 extra angle is present. **Each angle is an independent Gemini call**, so exact material micro-detail (e.g. marble veining) won't match pixel-for-pixel across angles — only material type / tone / mood.
+
+### PDF multi-page render (drawing tab)
+
+Uploading a **PDF** to the drawing dropzone triggers `uploadPdfForPreview()` → `POST /api/pdf-preview` (`pdf_utils.split_pdf_pages` → per-page PNGs saved as `outputs/_pdfpage_<token>.png` + thumbnails). Selected pages live in `pdfPages[]` (state). `doRender()` routes to `doRenderPdfPages()` when `isPdfMode`, which renders each selected page via `POST /api/render-pdf-page` (by `page_token`). `updateRenderBtnLabel()` shows "⚡ Render N trang đã chọn".
+
+**Scan toggle (`is_scan`):** the drawing tab has a "📷 ảnh chụp / scan chất lượng thấp" toggle (`isScanInput`). When on, `build_drawing_prompt(..., is_scan=True)` uses `_AUTOCAD_HINT_SCAN` (deskew / ignore glare / reconstruct faint lines) instead of `_AUTOCAD_HINT_CLEAN`. Passed as a Form field on both `/api/render` and `/api/render-pdf-page`.
 
 ### Key Design Decisions
 
