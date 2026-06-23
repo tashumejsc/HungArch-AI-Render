@@ -21,7 +21,6 @@ from pydantic import BaseModel
 
 import config
 import gemini_client
-import geometry_lock
 import license as lic
 import pdf_utils
 import prompts
@@ -140,22 +139,6 @@ async def api_render_pdf_page(
     except gemini_client.GeminiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
-    # ── Geometry Lock: chỉ áp dụng cho nhánh "Render 2D đẹp" (Top-View 3D Floor Plan) ──
-    # Endpoint này luôn là mode="drawing"; chỉ cần kiểm tra drawing_mode.
-    if drawing_mode == "2d_render":
-        try:
-            ai_result_path = config.OUTPUTS_DIR / result.image_filename
-            ai_result_bytes = ai_result_path.read_bytes()
-            locked_bytes = geometry_lock.apply_geometry_lock(
-                original_bytes=image_bytes,   # ảnh trang PDF đã tách làm bản gốc
-                ai_result_bytes=ai_result_bytes,
-            )
-            ai_result_path.write_bytes(locked_bytes)
-        except geometry_lock.GeometryLockError as exc:
-            print(f"[geometry_lock] Bỏ qua do lỗi: {exc}")
-        except Exception as exc:
-            print(f"[geometry_lock] Lỗi không lường trước, bỏ qua: {exc}")
-
     return JSONResponse({
         "seed":           result.seed,
         "image_url":      result.image_url,
@@ -256,22 +239,6 @@ async def api_render(
         )
     except gemini_client.GeminiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
-
-    # ── Geometry Lock: chỉ áp dụng cho nhánh "Render 2D đẹp" (Top-View 3D Floor Plan) ──
-    if mode == "drawing" and drawing_mode == "2d_render":
-        try:
-            ai_result_path = config.OUTPUTS_DIR / result.image_filename
-            ai_result_bytes = ai_result_path.read_bytes()
-            locked_bytes = geometry_lock.apply_geometry_lock(
-                original_bytes=image_bytes,
-                ai_result_bytes=ai_result_bytes,
-            )
-            ai_result_path.write_bytes(locked_bytes)
-            # Ghi đè đúng file cũ (cùng token/seed/url) — không tạo file mới.
-        except geometry_lock.GeometryLockError as exc:
-            print(f"[geometry_lock] Bỏ qua do lỗi: {exc}")
-        except Exception as exc:
-            print(f"[geometry_lock] Lỗi không lường trước, bỏ qua: {exc}")
 
     return JSONResponse({
         "seed":           result.seed,

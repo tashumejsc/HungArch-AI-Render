@@ -698,13 +698,9 @@ def build_exterior_prompt(
 # TAB 3: BẢN VẼ 2D
 # Sub-mode 'drawing_mode':
 #   '3d_perspective'  → AI tạo phối cảnh 3D góc người đứng (eye-level) từ mặt bằng/mặt đứng 2D
-#   '2d_render'       → AI tạo "Top-View 3D Floor Plan": dựng cảnh 3D đầy đủ (nội thất,
-#                        vật liệu, ánh sáng thật) rồi chụp bằng camera góc cao gần top-down
-#                        (KHÔNG phải orthographic phẳng kiểu xuất LayOut SketchUp — xem
-#                        _TOPVIEW_3D_CAMERA để biết lý do kỹ thuật).
+#   '2d_render'       → AI làm đẹp bản vẽ 2D gốc, GIỮ NGUYÊN góc nhìn 2D (V1.0.0 —
+#                        không đổi sang 3D, không overlay, không geometry-lock).
 # 'drawing_type': 'autocad' | 'sketch'
-# 'drawing_output' khi drawing_mode='2d_render': 'floor_plan' | 'site_plan'
-#   (vẫn nhận 'interior'/'exterior' cũ làm alias để tương thích ngược với main.py)
 # ---------------------------------------------------------------------------
 
 # --- Gợi ý theo CHẤT LƯỢNG ẢNH ĐẦU VÀO (autocad/sketch) -----------------------
@@ -769,163 +765,26 @@ DRAWING_ELEVATION_TO_3D = (
 )
 
 # ---------------------------------------------------------------------------
-# CAMERA "TOP-VIEW 3D FLOOR PLAN" — KHÔNG phải orthographic Parallel Projection phẳng.
-# Đây là kỹ thuật ngành gọi là "3D Floor Plan" / "Top-View 3D Rendering": một cảnh nội
-# thất 3D ĐẦY ĐỦ (đồ nội thất, vật liệu, ánh sáng thật) được chụp bằng camera Standard
-# có Field of View hẹp, đặt rất cao, ngắm gần như thẳng xuống nhưng KHÔNG đạt 90° tuyệt
-# đối — vẫn còn đủ góc để thấy mặt hông đồ vật và bóng đổ tự nhiên có chiều sâu.
-# Tham chiếu giáo trình V-Ray 7 (Camera Type: Standard, Field of View deg theo khổ ảnh)
-# và giáo trình SketchUp (Camera > Top, không bật Parallel Projection ở kỹ thuật này).
+# LAM DEP BAN VE 2D — giu nguyen goc nhin 2D goc (khong doi sang 3D).
+# Khoi phuc cach tiep can don gian cua V1.0.0 — da bo chuoi thu nghiem Top-View
+# 3D / overlay / geometry-lock vi ket qua khong on dinh.
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# KHÓA HÌNH HỌC CHO TOP-VIEW 3D — ưu tiên CAO NHẤT, đặt ĐẦU chuỗi prompt.
-# Đây là điểm quan trọng nhất: footprint/bố cục/tỷ lệ đầu ra phải trùng đầu vào.
-# Cảnh 3D được dựng ĐÈ LÊN bản vẽ gốc như một template khóa cứng, chỉ thêm chiều
-# cao + vật liệu + nội thất + ánh sáng, TUYỆT ĐỐI không đổi layout.
-# ---------------------------------------------------------------------------
-_TOPVIEW_GEOMETRY_LOCK = (
-    "GEOMETRY LOCK — HIGHEST PRIORITY, ZERO TOLERANCE: the input 2D drawing defines the EXACT "
-    "footprint your 3D scene must be built on. Every wall, room boundary, partition, door and "
-    "window opening, column, stair, balcony and the overall outline must appear in the output "
-    "at the IDENTICAL position, size, proportion and orientation as in the input — as if the 3D "
-    "scene were modelled directly on top of the input plan used as a locked tracing template. "
-    "DO NOT move, resize, rotate, add, remove, merge, split or rearrange any room or wall; "
-    "DO NOT change the number of rooms, the room proportions, or the overall aspect ratio of the "
-    "plan; DO NOT re-imagine or redraw the layout. The rendered plan outline must overlay the "
-    "input plan outline almost 1:1 (near-perfect registration). "
-    "You may ONLY add, ON TOP of this fixed 2D layout: real 3D height/volume, materials, "
-    "furniture, lighting and shadows — never alter the layout itself. "
-    "If any room ends up in a different place, a different size, or a different shape than the "
-    "input, the result is a failure and must be rejected."
-)
-
-_TOPVIEW_3D_CAMERA = (
-    "CAMERA SETUP — this is critical: a NEAR-OVERHEAD 'Top-View 3D Floor Plan' camera. "
-    "Place a standard perspective camera almost perfectly straight above the plan, looking "
-    "down at roughly 85–88° from the horizontal — about 95% of the way to a true overhead "
-    "view, with only a few degrees of residual tilt. Use a NARROW, near-telephoto field of "
-    "view (roughly 20–30°) from a high position so perspective distortion is minimal and the "
-    "rendered plan's outline lines up almost EXACTLY with the input plan's footprint. "
-    "The tiny residual tilt is intentional — it gives just enough 3D depth to reveal a thin "
-    "sliver of furniture sides and to cast soft, real 3D contact shadows, so the result reads "
-    "as a real photograph from above rather than a flat 2D diagram. "
-    "Do NOT increase the tilt into an oblique or isometric view: footprint alignment with the "
-    "input plan must stay near-perfect, the camera stays essentially top-down."
-)
-
-DRAWING_TO_2D_FLOOR_PLAN = (
-    "This is a 2D architectural FLOOR PLAN (mặt bằng) line drawing. "
-    "TASK: Transform this flat 2D floor plan into a fully furnished, photorealistic "
-    "'Top-View 3D Floor Plan' render — the premium presentation style used by real estate "
-    "and interior design studios, where the entire unit is modelled and furnished in 3D "
-    "and then photographed from a high top-down camera (see CAMERA SETUP). "
-    "READ the floor plan: solid lines = walls; arcs = door swings; gaps in walls = windows; "
-    "rectangles/icons = furniture and fixtures; any room-name text already printed on the "
-    "drawing (e.g. \"P.NGỦ\", \"PHÒNG KHÁCH\", \"WC\", \"BẾP\") tells you that room's function — "
-    "preserve every room boundary, every wall position, every door/window opening exactly "
-    "where drawn, and the overall proportions and scale of the unit. "
-    "BUILD a complete, fully realised 3D interior scene from this layout: "
-    "walls are real 3D walls, trimmed down to a low parapet height (roughly 300–500mm tall) "
-    "so the camera can see directly into every room from above — walls read as a clean dark "
-    "edge/poché line at this height, not full-height walls blocking the view; "
-    "floors are real photorealistic materials matching what each room implies (warm timber "
-    "parquet with visible wood grain and plank joints in bedrooms/living areas, "
-    "porcelain/ceramic tile with visible grout lines in bathrooms and kitchens, soft-pile "
-    "carpet texture where appropriate); "
-    "every room is FULLY FURNISHED with realistic, well-proportioned 3D furniture appropriate "
-    "to its function (bed with pillows/duvet in bedrooms, sofa/coffee table/TV console in the "
-    "living room, dining table with chairs, kitchen counters/cabinets, wardrobe, bathroom "
-    "fixtures) — furniture should have real volume, fabric texture, and soft shadow contact "
-    "with the floor, matching the polish of professional real-estate 3D floor plan renders; "
-    "doors are rendered as real 3D door leaves shown open at their drawn swing angle; "
-    "windows show a thin realistic frame and a soft hint of daylight/glass reflection. "
-    "LIGHTING: soft, even, naturally diffused interior daylight from the windows plus gentle "
-    "ambient fill — the kind of soft multi-directional light a real photo from above would "
-    "show, casting soft, naturally-blurred contact shadows under every piece of furniture "
-    "and along every wall base. Shadows must look physically real (soft penumbra, natural "
-    "falloff) — NOT a hard flat silhouette, NOT a single rigid cast-shadow direction. "
-    "Output: a warm, photorealistic, fully-furnished top-view 3D floor plan, "
-    "at the exact same layout, proportions and room arrangement as the input plan."
-)
-
-DRAWING_TO_2D_SITE_PLAN = (
-    "This is a 2D architectural SITE PLAN or LANDSCAPE LAYOUT (mặt bằng tổng thể / quy hoạch / "
-    "cảnh quan) line drawing, which may also show the interior room layout of the building "
-    "inside the plot. "
-    "TASK: Transform this flat 2D site plan into a fully realised, photorealistic top-view "
-    "3D site/landscape render — built as a complete 3D scene (buildings, paving, planting, "
-    "water features) and photographed from a high top-down camera (see CAMERA SETUP). "
-    "READ the site plan: the plot boundary line (often a dashed or coloured outline), building "
-    "outlines, room layout inside the building, road/path centrelines and widths, tree/shrub "
-    "symbols, water bodies and parking layout; any room-name or area-name text already printed "
-    "on the drawing (e.g. \"SÂN TRƯỚC\", \"PHÒNG KHÁCH\", \"BẾP\", \"SÂN SAU\") tells you that "
-    "area's function — preserve every footprint, every boundary line, and every plotted "
-    "element exactly where drawn, at the same scale and proportion. "
-    "BUILD a complete 3D landscape scene from this layout: "
-    "the building itself follows the same 'Top-View 3D Floor Plan' treatment as a fully "
-    "furnished interior (low parapet walls ~300–500mm so rooms are visible from above, "
-    "realistic floor materials per room, real 3D furniture appropriate to each room's "
-    "function); "
-    "OUTSIDE the building footprint, fill the plot with a rich, realistic landscape: "
-    "real 3D canopy trees scattered generously along the plot boundary and in garden corners "
-    "(varied size and species, layered photorealistic foliage viewed from above, casting soft "
-    "natural shadow), lawn/grass areas as real turf texture, gravel or pebble-paved zones "
-    "(sân rải sỏi) as a realistic loose-stone texture, paved courtyards/driveways as real "
-    "concrete or paver-tile texture with visible joints, small ornamental garden beds "
-    "(tiểu cảnh) with planting and stone accents; "
-    "water bodies (pools, ponds, fountains) become real water material with natural "
-    "reflections, subtle ripples and depth, not a flat colour fill; "
-    "parking areas show real paving with visible bay markings or parked car models if drawn. "
-    "LIGHTING: soft, natural daylight from one consistent high sun angle, casting soft, "
-    "naturally-blurred shadows from buildings and trees with realistic falloff and length — "
-    "physically believable outdoor daylight shadows, not flat graphic silhouettes. "
-    "Output: a warm, photorealistic, fully-realised top-view 3D site/landscape render with a "
-    "lushly landscaped plot, at the exact same layout, proportions and arrangement as the "
-    "input plan."
-)
-
-# ---------------------------------------------------------------------------
-# NHÃN TÊN PHÒNG ĐÈ LÊN ẢNH — dùng chung cho cả floor_plan và site_plan.
-# Tham chiếu mẫu chuẩn: layout kiểu DIMOR/Phương Nam House, chữ in hoa đặt giữa từng
-# phòng, đè trực tiếp lên mặt sàn render, không phải callout/box kéo ra ngoài.
-# ---------------------------------------------------------------------------
-_ROOM_LABEL_OVERLAY = (
-    "ROOM LABELS — add a short room-name label printed directly on top of the floor surface "
-    "inside each room/area, centred in that space, the way professional floor-plan "
-    "presentation boards do (e.g. DIMOR-style or real-estate marketing floor plans): "
-    "clean, legible, all-caps or title-case sans-serif text, small enough not to overwhelm "
-    "the room, in a neutral dark or white colour with enough contrast against the floor "
-    "material beneath it (add a very subtle text shadow or soft backing tint only if needed "
-    "for legibility). "
-    "If the original drawing already has room-name text or numbered legend callouts, use "
-    "those exact names/numbers (translate handwriting into clean typography, do not invent "
-    "different room names). If a room has no label in the original drawing, infer a sensible "
-    "Vietnamese architectural room name from its furniture and size (e.g. \"PHÒNG NGỦ\", "
-    "\"PHÒNG KHÁCH\", \"BẾP\", \"WC\", \"SÂN TRƯỚC\", \"SÂN SAU\") and label it consistently. "
-    "Every distinct room or outdoor area must have exactly one label — do not duplicate "
-    "labels, do not add dimension numbers, do not add furniture callouts beyond the room name."
-)
-
-# ---------------------------------------------------------------------------
-# CHẤT LƯỢNG ĐẦU RA RIÊNG CHO "TOP-VIEW 3D FLOOR PLAN" — đây LÀ ảnh nhiếp ảnh/render
-# 3D thật, khác hẳn QUALITY_SUFFIX gốc (vốn nói về ảnh phối cảnh góc thấp/eye-level).
-# Không dùng ngôn ngữ "flat/vector-like/orthographic" — ngược lại, nhấn mạnh chiều sâu,
-# vật liệu thật, ánh sáng mềm tự nhiên — đúng tinh thần render final trong giáo trình V-Ray.
-# LƯU Ý: KHÔNG cấm text/room-label ở đây nữa — _ROOM_LABEL_OVERLAY chịu trách nhiệm riêng
-# cho phần chữ; suffix này chỉ cấm watermark/dimension number/border kỹ thuật không mong muốn.
-# ---------------------------------------------------------------------------
-QUALITY_SUFFIX_2D = (
-    "Output must read as a genuine high-end CGI photograph taken from above — full "
-    "photorealistic materials, soft natural global illumination, gentle ambient occlusion "
-    "in corners and under furniture, subtle realistic reflections on glossy surfaces. "
-    "A light, natural depth-of-field falloff toward the frame edges is acceptable and "
-    "expected, the way a real high-vantage-point photo would render. "
-    "Professional real-estate / interior-design 'Top-View 3D Floor Plan' presentation "
-    "quality — warm, inviting, magazine-ready. "
-    "No dimension numbers, no watermark, no decorative page border, no company logo, "
-    "no people — every physical element (walls, floors, furniture, landscaping) must look "
-    "like a real object photographed in 3D space; room-name labels described above are the "
-    "only text allowed in the image."
+DRAWING_TO_2D = (
+    "This is a 2D architectural floor plan, elevation, or technical drawing. "
+    "TASK: Enhance this 2D drawing into a professional architectural presentation illustration. "
+    "PRESERVE ABSOLUTELY: the same 2D top-down plan view or elevation view angle — "
+    "DO NOT convert to 3D perspective, DO NOT change viewing angle. "
+    "All room dimensions, wall positions, proportions, doors and window locations stay identical. "
+    "ENHANCE to professional presentation standard: "
+    "fill rooms with appropriate coloured material surfaces "
+    "(warm wood tone for parquet floors, grey-blue for tiles, soft beige for carpet, "
+    "dark fill for walls in plan, white for exterior walls); "
+    "add soft shadow beneath furniture and walls for subtle depth; "
+    "add colour fills for landscape elements "
+    "(tree circles → lush green foliage in plan view, pool areas → turquoise blue water fill); "
+    "improve overall linework crispness and professional polish; "
+    "colour-code different room zones with tasteful, muted architectural palette. "
+    "Output: a beautiful, colour-rendered architectural presentation drawing at the exact same 2D view."
 )
 
 
@@ -944,10 +803,8 @@ def build_drawing_prompt(
 
     drawing_mode='3d_perspective' + drawing_output='interior' → phối cảnh nội thất 3D từ mặt bằng.
     drawing_mode='3d_perspective' + drawing_output='exterior' → phối cảnh ngoại thất 3D từ mặt đứng.
-    drawing_mode='2d_render' → dựng "Top-View 3D Floor Plan": cảnh 3D đầy đủ nội thất/vật liệu/
-        ánh sáng thật, chụp bằng camera góc cao gần top-down (xem _TOPVIEW_3D_CAMERA):
-        drawing_output='floor_plan' (alias cũ: 'interior') → mặt bằng nội thất/tầng, nội thất hóa đầy đủ.
-        drawing_output='site_plan'  (alias cũ: 'exterior') → mặt bằng tổng thể/cảnh quan 3D hóa.
+    drawing_mode='2d_render' → làm đẹp bản vẽ 2D gốc, GIỮ NGUYÊN góc nhìn 2D
+        (V1.0.0 — không đổi sang 3D, không overlay, không geometry-lock).
     drawing_type='autocad'|'sketch' → gợi ý thêm cho AI về chất lượng đường nét.
     is_scan=True → ảnh AutoCAD là ảnh chụp/scan chất lượng thấp (mờ, nghiêng, nhiễu, watermark),
         khác với file CAD vector xuất sạch. Chỉ có ý nghĩa khi drawing_type='autocad'.
@@ -969,15 +826,8 @@ def build_drawing_prompt(
             light = LIGHTING_PRESETS.get(lighting_key, {}).get("interior", "")
             return _join([DRAWING_TO_3D, dtype_hint, style, light, user, QUALITY_SUFFIX])
     else:
-        # Alias tương thích ngược: UI cũ gửi 'interior'/'exterior'; UI mới có thể gửi
-        # trực tiếp 'floor_plan'/'site_plan'.
-        is_site_plan = drawing_output in ("exterior", "site_plan")
-        base = DRAWING_TO_2D_SITE_PLAN if is_site_plan else DRAWING_TO_2D_FLOOR_PLAN
-        # _TOPVIEW_GEOMETRY_LOCK đặt ĐẦU TIÊN — geometry lock là ưu tiên cao nhất.
-        return _join([
-            _TOPVIEW_GEOMETRY_LOCK, base, dtype_hint,
-            _TOPVIEW_3D_CAMERA, _ROOM_LABEL_OVERLAY, user, QUALITY_SUFFIX_2D,
-        ])
+        # 2d_render — làm đẹp bản vẽ 2D gốc, giữ nguyên góc nhìn (cách V1.0.0).
+        return _join([DRAWING_TO_2D, dtype_hint, user, QUALITY_SUFFIX])
 
 
 def build_text_edit_prompt(instruction: str) -> str:
