@@ -744,6 +744,23 @@ _MULTI_ANGLE_LIGHTING = (
     "angles read as one consistent project."
 )
 
+# ---------------------------------------------------------------------------
+# KẸP ĐÈN TRẦN — đặt CUỐI prompt (vị trí recency mạnh nhất) để GHI ĐÈ mọi mention
+# "pendant / chandelier / globe pendant" trong mô tả style preset. Style preset như
+# "Hiện đại" có chữ "oversized globe pendants" → AI hay tự thêm đèn thả dù model
+# không có. Quy tắc: chỉ vẽ đèn CÓ THẬT trong model; nếu trần trống → chỉ downlight + cove.
+# ---------------------------------------------------------------------------
+_LIGHTING_FIXTURE_CLAMP = (
+    "CEILING FIXTURE HARD CONSTRAINT (this OVERRIDES any lamp/fixture wording in the style "
+    "description above): render ONLY the light fixtures physically modelled in the input image. "
+    "If the input ceiling has NO hanging fixtures, the output ceiling MUST stay free of pendant "
+    "lights, chandeliers, hanging lamps, globe pendants and any suspended fixture — even if the "
+    "style text names them; you may add only flush recessed downlights and at most one concealed "
+    "cove LED strip. Specifically: do NOT add a pendant or a row of pendants above a table, island "
+    "or counter. Ignore every 'pendant', 'chandelier' or 'hanging lamp' word from the style "
+    "description — those items are NOT present in this model."
+)
+
 
 # ---------------------------------------------------------------------------
 # GEMINI PROMPT BUILDERS
@@ -769,7 +786,7 @@ def build_interior_prompt(
 
     if use_reference_style:
         # Không có style/lighting preset — style đến 100% từ cam1 extracted palette.
-        return _join([lock, _INTERIOR_STYLE_CLAMP, user, QUALITY_SUFFIX])
+        return _join([lock, _INTERIOR_STYLE_CLAMP, user, QUALITY_SUFFIX, _LIGHTING_FIXTURE_CLAMP])
 
     if input_type == "textured":
         style_prompt = INTERIOR_STYLES.get(style_key, {}).get("prompt", "")
@@ -784,7 +801,9 @@ def build_interior_prompt(
     light = LIGHTING_PRESETS.get(lighting_key, {}).get("interior", "")
     ma = _MULTI_ANGLE_LIGHTING if multi_angle else ""
     # _INTERIOR_STYLE_CLAMP ngay sau style để kẹp lại: style chỉ là palette, không thêm đồ.
-    return _join([lock, style, _INTERIOR_STYLE_CLAMP, light, ma, user, QUALITY_SUFFIX])
+    # _LIGHTING_FIXTURE_CLAMP đặt CUỐI để ghi đè mọi mention "pendant" trong style preset.
+    return _join([lock, style, _INTERIOR_STYLE_CLAMP, light, ma, user, QUALITY_SUFFIX,
+                  _LIGHTING_FIXTURE_CLAMP])
 
 
 def build_exterior_prompt(
@@ -1034,23 +1053,27 @@ REFERENCE_INSTRUCTION = (
 # hình học -> cam2 đúng góc, chỉ mượn style.
 # ---------------------------------------------------------------------------
 STYLE_DESCRIPTION_PROMPT = (
-    "Analyze this architectural render and extract a reusable SURFACE MATERIAL PALETTE. "
-    "Return EXACTLY 5 lines in this format — nothing else:\n"
-    "FLOOR: [material name] — [color/tone] — [finish]\n"
-    "WALLS: [surface material] — [color/tone] — [finish/texture]\n"
-    "CEILING: [material] — [color] — [any cove/LED note]\n"
-    "PALETTE: [3 dominant color names, comma separated]\n"
-    "LIGHTING: [color temperature e.g. 3000K] — [warm/cool/neutral] — [day/evening/night]\n\n"
-    "ABSOLUTE RULES — any violation makes the output useless:\n"
-    "• Write ONLY about bare surfaces (floor, wall, ceiling). Do NOT name or describe any "
-    "specific object, furniture piece, equipment, artwork, logo, screen, fixture, or décor item\n"
-    "• Use ZERO positional words: no left, right, centre, front, back, facing, beside, above, "
-    "below, corner, behind, in front, near, far, or any direction word\n"
-    "• Describe what the surface material LOOKS LIKE as a material — NOT what you see in the scene\n"
-    "• Each line must be under 15 words\n"
-    "Output only the 5 lines, no preamble, no extra text."
+    "Analyze the SURFACE MATERIALS and LIGHTING in this architectural render. "
+    "Return ONLY a JSON object with these exact 6 string keys (each value 3-10 words, "
+    "describing MATERIAL and COLOUR only):\n"
+    '{"floor": "...", "walls": "...", "ceiling": "...", "accents": "...", '
+    '"palette": "...", "lighting": "..."}\n'
+    "Field meaning:\n"
+    "- floor: floor material + colour + finish (e.g. 'dark walnut hardwood, warm brown, satin')\n"
+    "- walls: wall surface material + colour + texture\n"
+    "- ceiling: ceiling material + colour + any cove/LED note\n"
+    "- accents: metal / wood / stone accent finishes and their colour\n"
+    "- palette: the 3 dominant colours, comma-separated\n"
+    "- lighting: colour temperature (e.g. 3000K) + warm/cool/neutral + day/evening/night\n"
+    "STRICT RULES — describe ONLY what each material LOOKS LIKE (its material, colour, finish): "
+    "never name a furniture piece, object, logo, screen, fixture, equipment or decoration; "
+    "never use positional / directional words (left, right, centre, front, back, facing, "
+    "behind, beside, corner, near, far). "
+    "Return ONLY the JSON object — no markdown fences, no explanation, no extra text."
 )
 
+# Caller (gemini_client.describe_style) parse JSON → dựng lại chuỗi palette nguyên tử
+# bằng Python (vứt bỏ mọi text tự do) → KHÔNG thể rò rỉ caption cảnh làm lệch góc cam.
 REFERENCE_STYLE_SYNC = (
     "SURFACE STYLE PALETTE — apply ONLY these surface materials, colours and lighting onto "
     "THIS render. The camera angle, viewpoint, composition and ALL geometry come EXCLUSIVELY "

@@ -179,11 +179,13 @@ def describe_style(
     """
     client = _get_client()
     parts = [_to_part(image_bytes, image_mime), prompts.STYLE_DESCRIPTION_PROMPT]
-    # Ép TEXT output — dùng response_mime_type (cùng pattern với analyze_mood, đã
-    # chứng minh hoạt động với image model). response_modalities=["TEXT"] hay None
-    # có thể khiến model trả về ảnh → response.text = None → style sync bị bỏ qua.
+    # Ép JSON output (cùng pattern với analyze_mood, đã chứng minh chạy tốt với image
+    # model). Sau đó CHỈ đọc 6 khóa nguyên tử rồi tự dựng lại chuỗi palette bằng Python.
+    # → model KHÔNG thể rò rỉ caption cảnh (vd "long table viewed from end") làm lệch
+    #   góc cam2, vì mọi text tự do bị vứt bỏ, chỉ giữ giá trị 6 khóa vật liệu.
+    raw = ""
     for cfg in (
-        types.GenerateContentConfig(response_mime_type="text/plain"),
+        types.GenerateContentConfig(response_mime_type="application/json"),
         types.GenerateContentConfig(response_modalities=["TEXT"]),
         None,
     ):
@@ -192,12 +194,48 @@ def describe_style(
             if cfg is not None:
                 kwargs["config"] = cfg
             response = client.models.generate_content(**kwargs)
-            text = (getattr(response, "text", None) or "").strip()
-            if text:
-                return text
+            raw = (getattr(response, "text", None) or "").strip()
+            if raw:
+                break
         except Exception:
             continue
-    return ""
+    return _build_palette_text(raw)
+
+
+# 6 khóa vật liệu nguyên tử + nhãn hiển thị khi dựng lại chuỗi palette.
+_PALETTE_KEYS = ("floor", "walls", "ceiling", "accents", "palette", "lighting")
+_PALETTE_LABELS = {
+    "floor": "FLOOR", "walls": "WALLS", "ceiling": "CEILING",
+    "accents": "ACCENTS", "palette": "COLOUR PALETTE", "lighting": "LIGHTING",
+}
+
+
+def _build_palette_text(raw: str) -> str:
+    """Parse JSON mô tả style → chuỗi palette nguyên tử, an toàn (không caption cảnh).
+
+    Trả về "" nếu không parse được → render() bỏ qua style sync, GIỮ ĐÚNG góc cam
+    (thà sai màu còn hơn sai góc). Đây là default an toàn có chủ đích.
+    """
+    if not raw:
+        return ""
+    data = None
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        m = re.search(r'\{.*\}', raw, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group())
+            except Exception:
+                data = None
+    if not isinstance(data, dict):
+        return ""
+    out = []
+    for k in _PALETTE_KEYS:
+        v = data.get(k)
+        if isinstance(v, str) and v.strip():
+            out.append(f"{_PALETTE_LABELS[k]}: {v.strip()}")
+    return " | ".join(out)
 
 
 def render(
