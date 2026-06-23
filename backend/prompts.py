@@ -12,17 +12,24 @@ from __future__ import annotations
 # KHÓA HÌNH HỌC — bắt Gemini giữ TUYỆT ĐỐI bố cục SketchUp
 # ---------------------------------------------------------------------------
 GEOMETRY_LOCK = (
-    "Transform this SketchUp architectural model screenshot into a photorealistic render. "
+    "Apply photorealistic materials and lighting ONTO this exact SketchUp clay model — you are "
+    "texturing the existing geometry, NOT designing a new room. "
     "ABSOLUTE RULE — preserve with zero tolerance: "
     "the exact camera viewpoint, field of view, perspective projection, and framing; "
-    "every wall, floor, ceiling position and dimension; "
+    "every wall, floor, ceiling position and dimension, and the room's exact proportions; "
     "the precise location, size and shape of all windows, doors and openings; "
     "all built-in architectural elements (columns, beams, niches, steps, soffits); "
-    "the exact position and footprint of every furniture piece and fixture. "
+    "the exact position, size, footprint and ORIENTATION of every furniture piece and fixture. "
+    "FURNITURE IDENTITY LOCK — this is critical: every furniture piece must stay the SAME object at "
+    "the SAME size — keep its shape, proportion and count exactly. DO NOT replace, restyle, enlarge, "
+    "shrink, add, remove or rearrange any piece: a plain table must stay that same table at the same "
+    "size (do NOT turn it into a larger island or a different counter); keep the same chairs in the "
+    "same number and arrangement; keep cabinets at the same length and height. "
     "You may ONLY add: realistic surface materials and finishes, textures, "
-    "lighting (artificial lamps and natural sunlight), shadows, reflections, "
-    "decorative objects, plants, and fine surface detail that does NOT alter geometry. "
-    "The room layout, camera angle, and composition must be absolutely identical to the input image."
+    "lighting (artificial lamps and natural sunlight), shadows, reflections, and fine surface detail "
+    "that does NOT alter any geometry, size or position. "
+    "The room layout, every object's size and position, the camera angle, and the overall composition "
+    "must be absolutely identical to the input image — only the materials and lighting are new."
 )
 
 # ---------------------------------------------------------------------------
@@ -37,7 +44,10 @@ GEOMETRY_LOCK_TEXTURED = (
     "every wall, floor, ceiling position and dimension; "
     "the precise location, size and shape of all windows, doors and openings; "
     "all built-in architectural elements (columns, beams, niches, steps, soffits); "
-    "the exact position and footprint of every furniture piece and fixture; "
+    "the exact position, size, footprint and orientation of every furniture piece and fixture; "
+    "FURNITURE IDENTITY LOCK — every furniture piece must stay the SAME object at the SAME size: "
+    "do NOT replace, restyle, enlarge, shrink, add, remove or rearrange any piece (a table stays "
+    "that same table at the same size, keep the same chairs in the same number and arrangement); "
     "the EXISTING material palette and colour scheme already applied in the SketchUp model — "
     "do NOT replace, recolour, or change the type of any existing material. "
     "You may ONLY improve: photorealistic texture resolution and micro-detail (wood grain, stone veining, "
