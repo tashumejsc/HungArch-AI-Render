@@ -59,6 +59,28 @@ def _aspect_from_bytes(image_bytes: bytes) -> str:
         return "1:1"
 
 
+def _downscale_reference(reference_bytes: bytes, max_side: int = 384) -> bytes:
+    """Hạ độ phân giải ảnh reference để CHỐNG 'reference dominance'.
+
+    Khi reference là ảnh render sắc nét, Gemini hay copy luôn bố cục/góc của nó thay
+    vì render hình học từ ảnh SketchUp chính → mọi góc bị giống nhau. Hạ reference
+    xuống nhỏ (mặc định 384px) làm mất chi tiết bố cục nhưng GIỮ màu/vật liệu/tông
+    sáng → Gemini buộc lấy hình học từ ảnh chính, chỉ mượn 'style' từ reference.
+    """
+    try:
+        with Image.open(io.BytesIO(reference_bytes)) as im:
+            im = im.convert("RGB")
+            w, h = im.size
+            scale = max_side / float(max(w, h))
+            if scale < 1.0:
+                im = im.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+            buf = io.BytesIO()
+            im.save(buf, format="PNG")
+            return buf.getvalue()
+    except Exception:
+        return reference_bytes
+
+
 def _extract_image(response) -> bytes:
     """Lấy bytes ảnh đầu tiên từ response của Gemini."""
     candidates = getattr(response, "candidates", None) or []
@@ -160,18 +182,21 @@ def render(
     aspect = _aspect_from_bytes(image_bytes)
 
     if reference_bytes:
-        # Gắn NHÃN TEXT trước MỖI ảnh để Gemini không nhầm vai trò.
-        # Nếu chỉ xếp [img_su, img_ref, prompt] thì Gemini bị hút về ảnh render
-        # chi tiết hơn (reference) và copy luôn bố cục → sai hình học.
+        # Gắn NHÃN TEXT trước MỖI ảnh để Gemini không nhầm vai trò + HẠ PHÂN GIẢI
+        # reference để Gemini không copy được bố cục của nó (chống reference dominance:
+        # nếu không, mọi góc camera bị giống ảnh reference).
+        ref_small = _downscale_reference(reference_bytes)
         full_prompt = f"{prompt_text}\n\n{prompts.REFERENCE_INSTRUCTION}"
         parts: list = [
             "IMAGE 1 below is the PRIMARY INPUT — the SketchUp model. You MUST reproduce its "
             "exact camera angle, geometry, spatial layout and composition in your render:",
             _to_part(image_bytes, image_mime),
-            "IMAGE 2 below is a STYLE REFERENCE ONLY. Use it solely to match colour grading, "
-            "material finish and lighting mood. DO NOT copy its camera angle, layout, geometry, "
-            "furniture, objects, screen/signage content, text or composition:",
-            _to_part(reference_bytes, reference_mime),
+            "IMAGE 2 below is a STYLE REFERENCE ONLY, and it is intentionally LOW-RESOLUTION / "
+            "blurry — read ONLY its overall colours, material tones and lighting mood from it. "
+            "It carries NO usable geometry: DO NOT copy its camera angle, layout, shapes, "
+            "furniture, objects, screen/signage content, text or composition — take ALL geometry "
+            "and the camera from IMAGE 1:",
+            _to_part(ref_small, "image/png"),
             full_prompt,
         ]
     else:
