@@ -1,6 +1,11 @@
 # --- Bí mật: KHÔNG bao giờ đẩy khóa API lên GitHub ---
 .env
 
+# Công cụ cấp key + khoá bí mật — TUYỆT ĐỐI không commit
+HD CAP KEYGEN/
+hungarch_private.pem
+hungarch_keygen.py
+
 # Môi trường ảo Python
 .venv/
 venv/
