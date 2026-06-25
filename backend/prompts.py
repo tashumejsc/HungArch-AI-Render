@@ -1058,17 +1058,21 @@ REFERENCE_INSTRUCTION = (
 # ---------------------------------------------------------------------------
 STYLE_DESCRIPTION_PROMPT = (
     "Analyze the SURFACE MATERIALS and LIGHTING in this architectural render. "
-    "Return ONLY a JSON object with these exact 6 string keys (each value 3-10 words, "
-    "describing MATERIAL and COLOUR only):\n"
-    '{"floor": "...", "walls": "...", "ceiling": "...", "accents": "...", '
-    '"palette": "...", "lighting": "..."}\n'
-    "Field meaning:\n"
-    "- floor: floor material + colour + finish (e.g. 'dark walnut hardwood, warm brown, satin')\n"
-    "- walls: wall surface material + colour + texture\n"
-    "- ceiling: ceiling material + colour + any cove/LED note\n"
-    "- accents: metal / wood / stone accent finishes and their colour\n"
-    "- palette: the 3 dominant colours, comma-separated\n"
-    "- lighting: colour temperature (e.g. 3000K) + warm/cool/neutral + day/evening/night\n"
+    "Return ONLY a JSON object with exactly 6 keys. Each value is a JSON object "
+    "with exactly 4 sub-fields (material, hex, coverage_pct, finish):\n"
+    '{\n'
+    '  "floor":   {"material": "<3-8 words: material + colour>", "hex": "<#rrggbb>", "coverage_pct": <0-100>, "finish": "<matte|satin|semi-gloss|gloss|polished|brushed>"},\n'
+    '  "walls":   {"material": "<3-8 words>", "hex": "<#rrggbb>", "coverage_pct": <0-100>, "finish": "<see above>"},\n'
+    '  "ceiling": {"material": "<3-8 words>", "hex": "<#rrggbb>", "coverage_pct": <0-100>, "finish": "<see above|n/a>"},\n'
+    '  "accents": {"material": "<3-8 words: metal/wood/stone accent>", "hex": "<#rrggbb>", "coverage_pct": <0-100>, "finish": "<see above>"},\n'
+    '  "palette": {"material": "<3 dominant hex values comma-separated>", "hex": "<#rrggbb most dominant>", "coverage_pct": 100, "finish": "n/a"},\n'
+    '  "lighting": {"material": "<colour temp e.g. 3000K warm white>", "hex": "<#rrggbb light tint>", "coverage_pct": 100, "finish": "<warm|cool|neutral>"}\n'
+    '}\n'
+    "Sub-field rules:\n"
+    "- material: surface material + colour description ONLY (3-8 words, NO furniture/object/fixture names)\n"
+    "- hex: single most representative hex colour of that surface (e.g. '#4a3728')\n"
+    "- coverage_pct: approximate % of the scene this surface visually occupies (integer 0-100)\n"
+    "- finish: reflectance descriptor — matte / satin / semi-gloss / gloss / polished / brushed / n/a\n"
     "STRICT RULES — describe ONLY what each material LOOKS LIKE (its material, colour, finish): "
     "never name a furniture piece, object, logo, screen, fixture, equipment or decoration; "
     "never use positional / directional words (left, right, centre, front, back, facing, "

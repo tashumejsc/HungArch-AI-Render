@@ -213,6 +213,9 @@ _PALETTE_LABELS = {
 def _build_palette_text(raw: str) -> str:
     """Parse JSON mô tả style → chuỗi palette nguyên tử, an toàn (không caption cảnh).
 
+    Schema mới: mỗi key là object {material, hex, coverage_pct, finish} — truyền hex
+    màu cụ thể + finish giúp Gemini tái tạo đúng tông màu khi render góc cam2.
+    Tương thích ngược: nếu Gemini trả về schema cũ (string đơn), vẫn đọc được.
     Trả về "" nếu không parse được → render() bỏ qua style sync, GIỮ ĐÚNG góc cam
     (thà sai màu còn hơn sai góc). Đây là default an toàn có chủ đích.
     """
@@ -233,8 +236,28 @@ def _build_palette_text(raw: str) -> str:
     out = []
     for k in _PALETTE_KEYS:
         v = data.get(k)
-        if isinstance(v, str) and v.strip():
-            out.append(f"{_PALETTE_LABELS[k]}: {v.strip()}")
+        label = _PALETTE_LABELS[k]
+        if isinstance(v, dict):
+            # Schema mới: object {material, hex, coverage_pct, finish}
+            material = str(v.get("material", "")).strip()
+            hex_val  = str(v.get("hex", "")).strip()
+            coverage = v.get("coverage_pct")
+            finish   = str(v.get("finish", "")).strip()
+            if not material and not hex_val:
+                continue
+            piece = material
+            # Chỉ nhận hex hợp lệ (#rrggbb) để tránh garbage string
+            if hex_val.startswith("#") and len(hex_val) in (4, 7):
+                piece += f" ({hex_val})" if piece else hex_val
+            if finish and finish.lower() not in ("n/a", ""):
+                if isinstance(coverage, (int, float)) and 0 < int(coverage) < 100:
+                    piece += f", {finish} finish, ~{int(coverage)}% coverage"
+                else:
+                    piece += f", {finish} finish"
+            out.append(f"{label}: {piece}")
+        elif isinstance(v, str) and v.strip():
+            # Tương thích ngược: schema cũ (string đơn)
+            out.append(f"{label}: {v.strip()}")
     return " | ".join(out)
 
 
